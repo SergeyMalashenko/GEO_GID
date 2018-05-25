@@ -26,8 +26,8 @@ import argparse
 from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--train" , type=str             )
-parser.add_argument("--output", type=str, default="" )
+parser.add_argument("--input" , type=str             )
+parser.add_argument("--model" , type=str, default="" )
 parser.add_argument("--seed"  , type=int, default=43 )
 
 args = parser.parse_args()
@@ -158,15 +158,15 @@ def trainModel( dataFrame, targetColumn ):
 	
 	return clf
 
-trainFileName = args.train
-modelFileName = args.output
+inputFileName = args.input
+modelFileName = args.model
 
-trainDataFrame = loadData      ( trainFileName                 )
+trainDataFrame = loadData      ( inputFileName                 )
 
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN )
-trainedModel   = trainModel    ( trainDataFrame, TARGET_COLUMN )
+Model          = trainModel    ( trainDataFrame, TARGET_COLUMN )
 
 if modelFileName != "" :
 	with open( modelFileName, 'wb') as fid:
-		cPickle.dump( trainedModel, fid)
+		cPickle.dump( Model, fid)
 
