@@ -23,8 +23,9 @@ import argparse
 from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--test" , type=str )
-parser.add_argument("--input", type=str )
+parser.add_argument("--test"  , type=str             )
+parser.add_argument("--input" , type=str             )
+parser.add_argument("--output", type=str, default="" )
 
 def testModel( testedModel, dataFrame, targetColumn ):
 	import warnings

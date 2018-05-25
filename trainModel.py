@@ -76,23 +76,23 @@ def preProcessData( dataFrame, targetColumn ):
 		dataFrame[ targetColumn ] = Y_values_
 		return dataFrame
 	
-	for column in dataFrame:
-		min_    = dataFrame[[column]].min   ().values[0]
-		max_    = dataFrame[[column]].max   ().values[0]
-		median_ = dataFrame[[column]].median().values[0]
-		print( "{:30} min={:10}, max={:10}, median={:10}".format( column, min_, max_, median_ ) )
-
-
+	#for column in dataFrame:
+	#	min_    = dataFrame[[column]].min   ().values[0]
+	#	max_    = dataFrame[[column]].max   ().values[0]
+	#	median_ = dataFrame[[column]].median().values[0]
+	#	print( "{:30} min={:10}, max={:10}, median={:10}".format( column, min_, max_, median_ ) )
+	
+	
 	dataFrame = excludeAnomalies( dataFrame, targetColumn )
 	dataFrame = selectFeatures  ( dataFrame, targetColumn )
-
+	
 	for column in dataFrame:
 		min_    = dataFrame[[column]].min   ().values[0]
 		max_    = dataFrame[[column]].max   ().values[0]
 		median_ = dataFrame[[column]].median().values[0]
 		print( "{:30} min={:10}, max={:10}, median={:10}".format( column, min_, max_, median_ ) )
-
-
+	
+	
 	return dataFrame
 
 def trainModel( dataFrame, targetColumn ):

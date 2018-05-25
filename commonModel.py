@@ -6,6 +6,16 @@ INT_COLUMNS   = [ 'total_square', 'living_square', 'kitchen_square', 'number_of_
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
 TARGET_COLUMN =   'price'
 
+MIN_PRICE            = 100000; MAX_PRICE            = 100000000;
+MIN_TOTAL_SQUARE     = 12    ; MAX_TOTAL_SQUARE     = 500      ;
+MIN_LIVING_SQUARE    = 8     ; MAX_LIVING_SQUARE    = 300      ;
+MIN_KITCHEN_SQUARE   = 4     ; MAX_KITCHEN_SQUARE   = 100      ;
+MIN_NUMBER_OF_ROOMS  = 1     ; MAX_NUMBER_OF_ROOMS  = 10       ;
+MIN_FLOOR_NUMBER     = 1     ; MAX_FLOOR_NUMBER     = 50       ;
+MIN_NUMBER_OF_FLOORS = 1     ; MAX_NUMBER_OF_FLOORS = 50       ;
+MIN_LATITUDE         = 56.10 ; MAX_LATITUDE         = 56.50    ;
+MIN_LONGITUDE        = 43.70 ; MAX_LONGITUDE        = 44.30    ;
+
 def check_float( x ):
 	try:
 		float(x)
@@ -18,6 +28,22 @@ def check_row( row ):
 	return check_float_s
 
 def loadData( fileName ):
+	def preprocessing( dataFrame ) :
+		mask = True	
+		mask = (dataFrame['price'          ] > MIN_PRICE          ) & (dataFrame['price'          ] < MAX_PRICE          ) & mask
+		mask = (dataFrame['total_square'   ] > MIN_TOTAL_SQUARE   ) & (dataFrame['total_square'   ] < MAX_TOTAL_SQUARE   ) & mask
+		mask = (dataFrame['longitude'      ] > MIN_LONGITUDE      ) & (dataFrame['longitude'      ] < MAX_LONGITUDE      ) & mask
+		mask = (dataFrame['latitude'       ] > MIN_LATITUDE       ) & (dataFrame['latitude'       ] < MAX_LATITUDE       ) & mask
+		mask = (dataFrame['living_square'  ] > MIN_LIVING_SQUARE  ) & (dataFrame['living_square'  ] < MAX_LIVING_SQUARE  ) & mask
+		mask = (dataFrame['kitchen_square' ] > MIN_KITCHEN_SQUARE ) & (dataFrame['kitchen_square' ] < MAX_KITCHEN_SQUARE ) & mask
+		mask = (dataFrame['number_of_rooms'] > MIN_NUMBER_OF_ROOMS) & (dataFrame['number_of_rooms'] < MAX_NUMBER_OF_ROOMS) & mask
+		
+		mask = (dataFrame['floor_number'   ] > MIN_FLOOR_NUMBER   ) & (dataFrame['floor_number'   ] < MAX_FLOOR_NUMBER   ) & mask
+		
+		dataFrame = dataFrame[ mask ]	
+		
+		return dataFrame
+	
 	dataFrame = pd.read_csv(
 		fileName, 
 		sep=";",
@@ -39,19 +65,7 @@ def loadData( fileName ):
 	
 	dataFrame.drop_duplicates(subset=['price', 'total_square', 'number_of_rooms', 'longitude', 'latitude' ], keep='first', inplace=True)	
 	print('Shape of the data with numerical features:', dataFrame.shape)
+	dataFrame = preprocessing( dataFrame )
+	print('Shape of the data with numerical features:', dataFrame.shape)
 	
-	mask = True	
-	mask = (dataFrame['price'          ] > 1.0*1e6) & (dataFrame['price'       ] < 6.0*1e6 ) & mask
-	mask = (dataFrame['total_square'   ] > 20     ) & (dataFrame['total_square'] < 200     ) & mask
-	mask = (dataFrame['longitude'      ] > 0      ) & mask
-	mask = (dataFrame['latitude'       ] > 0      ) & mask
-	mask = (dataFrame['living_square'  ] > 10     ) & mask
-	mask = (dataFrame['kitchen_square' ] > 4      ) & mask
-	mask = (dataFrame['number_of_rooms'] > 0      ) & mask
-	
-	dataFrame = dataFrame[ mask ]	
-	
-		
 	return dataFrame
-
-
