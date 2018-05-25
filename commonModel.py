@@ -24,21 +24,22 @@ def check_float( x ):
 	return True
 
 def check_row( row ):
-	check_float_s = check_float( row.price ) and check_float( row.longitude ) and check_float( row.latitude )
+	check_float_s = check_float( row.longitude ) and check_float( row.latitude )
 	return check_float_s
 
 def loadData( fileName ):
 	def preprocessing( dataFrame ) :
-		mask = True	
-		mask = (dataFrame['price'          ] > MIN_PRICE          ) & (dataFrame['price'          ] < MAX_PRICE          ) & mask
-		mask = (dataFrame['total_square'   ] > MIN_TOTAL_SQUARE   ) & (dataFrame['total_square'   ] < MAX_TOTAL_SQUARE   ) & mask
-		mask = (dataFrame['longitude'      ] > MIN_LONGITUDE      ) & (dataFrame['longitude'      ] < MAX_LONGITUDE      ) & mask
-		mask = (dataFrame['latitude'       ] > MIN_LATITUDE       ) & (dataFrame['latitude'       ] < MAX_LATITUDE       ) & mask
-		mask = (dataFrame['living_square'  ] > MIN_LIVING_SQUARE  ) & (dataFrame['living_square'  ] < MAX_LIVING_SQUARE  ) & mask
-		mask = (dataFrame['kitchen_square' ] > MIN_KITCHEN_SQUARE ) & (dataFrame['kitchen_square' ] < MAX_KITCHEN_SQUARE ) & mask
-		mask = (dataFrame['number_of_rooms'] > MIN_NUMBER_OF_ROOMS) & (dataFrame['number_of_rooms'] < MAX_NUMBER_OF_ROOMS) & mask
+		mask = True
+		if 'price' in dataFrame.columns : mask = (dataFrame['price'           ] > MIN_PRICE            ) & (dataFrame['price'           ] < MAX_PRICE          ) & mask
+		mask = (dataFrame['total_square'    ] > MIN_TOTAL_SQUARE     ) & (dataFrame['total_square'    ] < MAX_TOTAL_SQUARE   ) & mask
+		mask = (dataFrame['longitude'       ] > MIN_LONGITUDE        ) & (dataFrame['longitude'       ] < MAX_LONGITUDE      ) & mask
+		mask = (dataFrame['latitude'        ] > MIN_LATITUDE         ) & (dataFrame['latitude'        ] < MAX_LATITUDE       ) & mask
+		mask = (dataFrame['living_square'   ] > MIN_LIVING_SQUARE    ) & (dataFrame['living_square'   ] < MAX_LIVING_SQUARE  ) & mask
+		mask = (dataFrame['kitchen_square'  ] > MIN_KITCHEN_SQUARE   ) & (dataFrame['kitchen_square'  ] < MAX_KITCHEN_SQUARE ) & mask
+		mask = (dataFrame['number_of_rooms' ] > MIN_NUMBER_OF_ROOMS  ) & (dataFrame['number_of_rooms' ] < MAX_NUMBER_OF_ROOMS) & mask
 		
-		mask = (dataFrame['floor_number'   ] > MIN_FLOOR_NUMBER   ) & (dataFrame['floor_number'   ] < MAX_FLOOR_NUMBER   ) & mask
+		mask = (dataFrame['floor_number'    ] > MIN_FLOOR_NUMBER     ) & (dataFrame['floor_number'    ] < MAX_FLOOR_NUMBER     ) & mask
+		mask = (dataFrame['number_of_floors'] > MIN_NUMBER_OF_FLOORS ) & (dataFrame['number_of_floors'] < MAX_NUMBER_OF_FLOORS ) & mask
 		
 		dataFrame = dataFrame[ mask ]	
 		
@@ -51,10 +52,11 @@ def loadData( fileName ):
 		verbose=True, 
 		keep_default_na=False
 	).dropna(how="all")
+
+	if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
+	dataFrame = dataFrame[ dataFrame.apply( check_row  , axis=1 ) ]
 	
-	dataFrame = dataFrame[ dataFrame.apply( check_row, axis=1 ) ]
-	
-	dataFrame['price'    ] = dataFrame['price'    ].astype(np.float64)
+	if 'price' in dataFrame.columns : dataFrame['price'    ] = dataFrame['price'    ].astype(np.float64)
 	dataFrame['longitude'] = dataFrame['longitude'].astype(np.float64)
 	dataFrame['latitude' ] = dataFrame['latitude' ].astype(np.float64)	
 	
@@ -63,7 +65,12 @@ def loadData( fileName ):
 	print('Shape of the data with numerical features:', dataFrame.shape)
 	print("List of features contained our dataset:",list( dataFrame.columns ))
 	
-	dataFrame.drop_duplicates(subset=['price', 'total_square', 'number_of_rooms', 'longitude', 'latitude' ], keep='first', inplace=True)	
+	subset = None
+	if 'price' in dataFrame.columns : 
+		subset=['price', 'total_square', 'number_of_rooms', 'longitude', 'latitude' ]	
+	else :
+		subset=['total_square', 'number_of_rooms', 'longitude', 'latitude' ]	
+	dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
 	print('Shape of the data with numerical features:', dataFrame.shape)
 	dataFrame = preprocessing( dataFrame )
 	print('Shape of the data with numerical features:', dataFrame.shape)
