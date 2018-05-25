@@ -27,6 +27,10 @@ def check_row( row ):
 	check_float_s = check_float( row.longitude ) and check_float( row.latitude )
 	return check_float_s
 
+def checkData( dataFrame ) :
+	
+	return
+
 def loadData( fileName ):
 	def preprocessing( dataFrame ) :
 		mask = True

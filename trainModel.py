@@ -28,11 +28,11 @@ from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGE
 parser = argparse.ArgumentParser()
 parser.add_argument("--input" , type=str             )
 parser.add_argument("--model" , type=str, default="" )
-parser.add_argument("--seed"  , type=int, default=43 )
+parser.add_argument("--seed"  , type=int, default=0  )
 
 args = parser.parse_args()
 
-def preProcessData( dataFrame, targetColumn ):
+def preProcessData( dataFrame, targetColumn, seed ):
 	def excludeAnomalies( dataFrame, targetColumn ):
 		Y_data = dataFrame    [[ targetColumn ]];       Y_values = Y_data.values;
 		X_data = dataFrame.drop( targetColumn, axis=1); X_values = X_data.values;
@@ -126,7 +126,7 @@ def postProcessData( INDEX_test, X_test, Y_test, Y_predict ) :
 		y_predict = Y_predict [ i ] 
 		print('{:6} {:10.1f} {:10.1f} {:10.1f}%'.format( index, y_test, y_predict, (y_predict-y_test)*100./y_test ))
 
-def trainModel( dataFrame, targetColumn ):
+def trainModel( dataFrame, targetColumn, seed ):
 	import warnings
 	warnings.filterwarnings('ignore')
 	
@@ -139,10 +139,10 @@ def trainModel( dataFrame, targetColumn ):
 	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
 	Y_values    = Y_values.ravel()
 		
-	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.2 )
+	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.2, random_state=seed )
 	
 	estimator  = RandomForestRegressor()
-	param_grid = {'n_estimators':(24,28,32,36,40), 'oob_score':(True,False),'max_features':(2,3,4,5) }
+	param_grid = {'n_estimators':(24,28,32,36,40), 'oob_score':(True,False),'max_features':(2,3,4,5), 'random_state':(seed,) }
 	n_jobs     = 3
 		
 	clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=3 )
@@ -160,11 +160,12 @@ def trainModel( dataFrame, targetColumn ):
 
 inputFileName = args.input
 modelFileName = args.model
+seed          = args.seed
 
 trainDataFrame = loadData      ( inputFileName                 )
 
-trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN )
-Model          = trainModel    ( trainDataFrame, TARGET_COLUMN )
+trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
+Model          = trainModel    ( trainDataFrame, TARGET_COLUMN, seed )
 
 if modelFileName != "" :
 	with open( modelFileName, 'wb') as fid:

@@ -7,7 +7,7 @@ Train model
 ```
 Check model
 ```
-
+./checkModel.py --input input/NizhnyNovgorod_train.csv --model model.pkl
 ```
 Test  model
 ```
