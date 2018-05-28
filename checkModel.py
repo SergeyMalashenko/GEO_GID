@@ -56,7 +56,7 @@ def checkModel( Model, dataFrame, targetColumn ):
 	
 	x =  X_values[:,0]; y = X_values[:,1]; c = np.minimum(  Y_relErr, 25 );
 	
-	plt.scatter (x, y, c=c )
+	plt.scatter (x, y, c=c,  )
 	plt.colorbar()
 	plt.show    ()
 	

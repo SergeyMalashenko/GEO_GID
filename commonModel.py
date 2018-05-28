@@ -1,8 +1,8 @@
 import pandas            as pd
 import numpy             as np
 
-FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude']
-INT_COLUMNS   = [ 'total_square', 'living_square', 'kitchen_square', 'number_of_rooms', 'floor_number', 'number_of_floors' ]
+FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square']
+INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors' ]
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
 TARGET_COLUMN =   'price'
 
@@ -16,6 +16,7 @@ MIN_NUMBER_OF_FLOORS = 1     ; MAX_NUMBER_OF_FLOORS = 50       ;
 MIN_LATITUDE         = 56.10 ; MAX_LATITUDE         = 56.50    ;
 MIN_LONGITUDE        = 43.70 ; MAX_LONGITUDE        = 44.30    ;
 
+MIN_PRICE_PER_SQUARE = 30000 ; MAX_PRICE_PER_SQUARE = 110000;
 def check_float( x ):
 	try:
 		float(x)
@@ -28,10 +29,9 @@ def check_row( row ):
 	return check_float_s
 
 def checkData( dataFrame ) :
-	
 	return
 
-def loadData( fileName ):
+def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	def preprocessing( dataFrame ) :
 		mask = True
 		if 'price' in dataFrame.columns : mask = (dataFrame['price'           ] > MIN_PRICE            ) & (dataFrame['price'           ] < MAX_PRICE          ) & mask
@@ -44,6 +44,10 @@ def loadData( fileName ):
 		
 		mask = (dataFrame['floor_number'    ] > MIN_FLOOR_NUMBER     ) & (dataFrame['floor_number'    ] < MAX_FLOOR_NUMBER     ) & mask
 		mask = (dataFrame['number_of_floors'] > MIN_NUMBER_OF_FLOORS ) & (dataFrame['number_of_floors'] < MAX_NUMBER_OF_FLOORS ) & mask
+		
+		if 'price' in dataFrame.columns :
+			pricePerSquare = ( dataFrame['price']/dataFrame['total_square'] )
+			mask = ( pricePerSquare > MIN_PRICE_PER_SQUARE ) & (pricePerSquare < MAX_PRICE_PER_SQUARE ) & mask
 		
 		dataFrame = dataFrame[ mask ]	
 		
@@ -65,7 +69,8 @@ def loadData( fileName ):
 	dataFrame['latitude' ] = dataFrame['latitude' ].astype(np.float64)	
 	
 	print('Shape of the data with all features:', dataFrame.shape)
-	dataFrame = dataFrame.select_dtypes(exclude=['object'])
+	if COLUMN_TYPE == 'NUMERICAL' :
+		dataFrame = dataFrame.select_dtypes(exclude=['object'])
 	print('Shape of the data with numerical features:', dataFrame.shape)
 	print("List of features contained our dataset:",list( dataFrame.columns ))
 	
