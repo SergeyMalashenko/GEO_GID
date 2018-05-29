@@ -1,6 +1,17 @@
 import pandas            as pd
 import numpy             as np
 
+from sklearn.preprocessing      import LabelEncoder
+from sklearn.preprocessing      import MinMaxScaler
+from sklearn.preprocessing      import minmax_scale
+from sklearn.preprocessing      import MaxAbsScaler
+from sklearn.preprocessing      import StandardScaler
+from sklearn.preprocessing      import RobustScaler
+from sklearn.preprocessing      import Normalizer
+from sklearn.preprocessing.data import QuantileTransformer
+
+
+
 FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square']
 INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors' ]
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
@@ -16,7 +27,7 @@ MIN_NUMBER_OF_FLOORS = 1     ; MAX_NUMBER_OF_FLOORS = 50       ;
 MIN_LATITUDE         = 56.10 ; MAX_LATITUDE         = 56.50    ;
 MIN_LONGITUDE        = 43.70 ; MAX_LONGITUDE        = 44.30    ;
 
-MIN_PRICE_PER_SQUARE = 30000 ; MAX_PRICE_PER_SQUARE = 110000;
+#MIN_PRICE_PER_SQUARE = 30000 ; MAX_PRICE_PER_SQUARE = 110000;
 def check_float( x ):
 	try:
 		float(x)
@@ -34,7 +45,9 @@ def checkData( dataFrame ) :
 def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	def preprocessing( dataFrame ) :
 		mask = True
-		if 'price' in dataFrame.columns : mask = (dataFrame['price'           ] > MIN_PRICE            ) & (dataFrame['price'           ] < MAX_PRICE          ) & mask
+		if 'price' in dataFrame.columns : 
+			mask = (dataFrame['price'           ] > MIN_PRICE            ) & (dataFrame['price'           ] < MAX_PRICE          ) & mask
+		
 		mask = (dataFrame['total_square'    ] > MIN_TOTAL_SQUARE     ) & (dataFrame['total_square'    ] < MAX_TOTAL_SQUARE   ) & mask
 		mask = (dataFrame['longitude'       ] > MIN_LONGITUDE        ) & (dataFrame['longitude'       ] < MAX_LONGITUDE      ) & mask
 		mask = (dataFrame['latitude'        ] > MIN_LATITUDE         ) & (dataFrame['latitude'        ] < MAX_LATITUDE       ) & mask
@@ -45,11 +58,22 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 		mask = (dataFrame['floor_number'    ] > MIN_FLOOR_NUMBER     ) & (dataFrame['floor_number'    ] < MAX_FLOOR_NUMBER     ) & mask
 		mask = (dataFrame['number_of_floors'] > MIN_NUMBER_OF_FLOORS ) & (dataFrame['number_of_floors'] < MAX_NUMBER_OF_FLOORS ) & mask
 		
-		if 'price' in dataFrame.columns :
-			pricePerSquare = ( dataFrame['price']/dataFrame['total_square'] )
-			mask = ( pricePerSquare > MIN_PRICE_PER_SQUARE ) & (pricePerSquare < MAX_PRICE_PER_SQUARE ) & mask
-		
 		dataFrame = dataFrame[ mask ]	
+		
+		if 'price' in dataFrame.columns :
+			mask = True
+			
+			pricePerSquare       = ( dataFrame['price']/dataFrame['total_square'] )
+			pricePerSquareValues = pricePerSquare.values
+			
+			robustScaler = RobustScaler(quantile_range=(10, 90) )
+			robustScaler.fit( pricePerSquareValues.reshape((-1,1)) )
+			pricePerSquareValues = robustScaler.transform( pricePerSquareValues.reshape((-1,1)) ).reshape(-1)
+			
+			mask = ( pricePerSquareValues > -1 ) & ( pricePerSquareValues  < 1 ) & mask
+			print( 'RobustScaler ', robustScaler.center_, robustScaler.scale_ )
+			
+			dataFrame = dataFrame[ mask ]	
 		
 		return dataFrame
 	
@@ -64,9 +88,14 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
 	dataFrame = dataFrame[ dataFrame.apply( check_row  , axis=1 ) ]
 	
-	if 'price' in dataFrame.columns : dataFrame['price'    ] = dataFrame['price'    ].astype(np.float64)
+	if 'price' in dataFrame.columns : dataFrame['price' ] = dataFrame['price'    ].astype(np.float64)
 	dataFrame['longitude'] = dataFrame['longitude'].astype(np.float64)
-	dataFrame['latitude' ] = dataFrame['latitude' ].astype(np.float64)	
+	dataFrame['latitude' ] = dataFrame['latitude' ].astype(np.float64)
+	
+	#print( dataFrame['type'].unique() )
+	#lb_make = LabelEncoder()
+	#dataFrame['type_code'] = lb_make.fit_transform(dataFrame['type'])
+	#print( dataFrame['type_code'])
 	
 	print('Shape of the data with all features:', dataFrame.shape)
 	if COLUMN_TYPE == 'NUMERICAL' :

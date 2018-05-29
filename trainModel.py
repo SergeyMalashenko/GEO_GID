@@ -158,6 +158,14 @@ def trainModel( dataFrame, targetColumn, seed ):
 	
 	return clf
 
+def trainNeuralNetworkModel( dataFrame, targetColumn, seed ):
+	import warnings
+	warnings.filterwarnings('ignore')
+	
+	return clf
+
+
+
 inputFileName = args.input
 modelFileName = args.model
 seed          = args.seed
