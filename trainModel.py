@@ -142,7 +142,7 @@ def trainModel( dataFrame, targetColumn, seed ):
 	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.2, random_state=seed )
 	
 	estimator  = RandomForestRegressor()
-	param_grid = {'n_estimators':(24,28,32,36,40), 'oob_score':(True,False),'max_features':(2,3,4,5), 'random_state':(seed,) }
+	param_grid = {'n_estimators':(24,32,40,48,56), 'oob_score':(True,False),'max_features':(2,3,4,5), 'random_state':(seed,) }
 	n_jobs     = 3
 		
 	clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=3 )
