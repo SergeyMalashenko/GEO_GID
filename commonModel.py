@@ -10,8 +10,6 @@ from sklearn.preprocessing      import RobustScaler
 from sklearn.preprocessing      import Normalizer
 from sklearn.preprocessing.data import QuantileTransformer
 
-
-
 FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square']
 INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors' ]
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
@@ -40,26 +38,24 @@ def check_row( row ):
 	check_float_s = check_float( row.longitude ) and check_float( row.latitude )
 	return check_float_s
 
-def checkData( dataFrame ) :
-	return
+def processData( dataFrame ) :
+	mask = True
+		
+	mask = (dataFrame['total_square'    ] >= MIN_TOTAL_SQUARE     ) & (dataFrame['total_square'    ] <= MAX_TOTAL_SQUARE   ) & mask
+	mask = (dataFrame['longitude'       ] >= MIN_LONGITUDE        ) & (dataFrame['longitude'       ] <= MAX_LONGITUDE      ) & mask
+	mask = (dataFrame['latitude'        ] >= MIN_LATITUDE         ) & (dataFrame['latitude'        ] <= MAX_LATITUDE       ) & mask
+	mask = (dataFrame['living_square'   ] >= MIN_LIVING_SQUARE    ) & (dataFrame['living_square'   ] <= MAX_LIVING_SQUARE  ) & mask
+	mask = (dataFrame['kitchen_square'  ] >= MIN_KITCHEN_SQUARE   ) & (dataFrame['kitchen_square'  ] <= MAX_KITCHEN_SQUARE ) & mask
+	mask = (dataFrame['number_of_rooms' ] >= MIN_NUMBER_OF_ROOMS  ) & (dataFrame['number_of_rooms' ] <= MAX_NUMBER_OF_ROOMS) & mask
+	
+	mask = (dataFrame['floor_number'    ] >= MIN_FLOOR_NUMBER     ) & (dataFrame['floor_number'    ] <= MAX_FLOOR_NUMBER     ) & mask
+	mask = (dataFrame['number_of_floors'] >= MIN_NUMBER_OF_FLOORS ) & (dataFrame['number_of_floors'] <= MAX_NUMBER_OF_FLOORS ) & mask
+	
+	return dataFrame[ mask ]
 
 def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
-	def preprocessing( dataFrame ) :
-		mask = True
-		#if 'price' in dataFrame.columns : 
-		#	mask = (dataFrame['price'           ] > MIN_PRICE            ) & (dataFrame['price'           ] < MAX_PRICE          ) & mask
-		
-		mask = (dataFrame['total_square'    ] > MIN_TOTAL_SQUARE     ) & (dataFrame['total_square'    ] < MAX_TOTAL_SQUARE   ) & mask
-		mask = (dataFrame['longitude'       ] > MIN_LONGITUDE        ) & (dataFrame['longitude'       ] < MAX_LONGITUDE      ) & mask
-		mask = (dataFrame['latitude'        ] > MIN_LATITUDE         ) & (dataFrame['latitude'        ] < MAX_LATITUDE       ) & mask
-		mask = (dataFrame['living_square'   ] > MIN_LIVING_SQUARE    ) & (dataFrame['living_square'   ] < MAX_LIVING_SQUARE  ) & mask
-		mask = (dataFrame['kitchen_square'  ] > MIN_KITCHEN_SQUARE   ) & (dataFrame['kitchen_square'  ] < MAX_KITCHEN_SQUARE ) & mask
-		mask = (dataFrame['number_of_rooms' ] > MIN_NUMBER_OF_ROOMS  ) & (dataFrame['number_of_rooms' ] < MAX_NUMBER_OF_ROOMS) & mask
-		
-		mask = (dataFrame['floor_number'    ] > MIN_FLOOR_NUMBER     ) & (dataFrame['floor_number'    ] < MAX_FLOOR_NUMBER     ) & mask
-		mask = (dataFrame['number_of_floors'] > MIN_NUMBER_OF_FLOORS ) & (dataFrame['number_of_floors'] < MAX_NUMBER_OF_FLOORS ) & mask
-		
-		dataFrame = dataFrame[ mask ]	
+	def preProcessData( dataFrame ):
+		dataFrame = processData( dataFrame )
 		
 		if 'price' in dataFrame.columns :
 			mask = True
@@ -67,7 +63,7 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 			pricePerSquare       = ( dataFrame['price']/dataFrame['total_square'] )
 			pricePerSquareValues = pricePerSquare.values
 			
-			robustScaler = RobustScaler(quantile_range=(10, 90) )
+			robustScaler = RobustScaler(quantile_range=(15, 85) )
 			robustScaler.fit( pricePerSquareValues.reshape((-1,1)) )
 			pricePerSquareValues = robustScaler.transform( pricePerSquareValues.reshape((-1,1)) ).reshape(-1)
 			
@@ -111,7 +107,7 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 		subset=['total_square', 'number_of_rooms', 'longitude', 'latitude' ]	
 	dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
 	print('Shape of the data with numerical features:', dataFrame.shape)
-	dataFrame = preprocessing( dataFrame )
+	dataFrame = preProcessData( dataFrame )
 	print('Shape of the data with numerical features:', dataFrame.shape)
 	
 	return dataFrame

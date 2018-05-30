@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -19,12 +18,14 @@ import _pickle           as cPickle
 
 import itertools
 import argparse
+import types
 
-from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
+from commonModel import processData, loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model" , type=str             )
-parser.add_argument("--input" , type=str             )
+parser.add_argument("--input" , type=str, default="" )
+parser.add_argument("--query" , type=str, default="" ) 
 parser.add_argument("--output", type=str, default="" )
 
 def testModel( Model, dataFrame ):
@@ -46,12 +47,21 @@ outputFileName = args.output
 Model = None
 with open( modelFileName, 'rb') as fid:
 	Model = cPickle.load(fid)
-#Load data
-inputDataFrame = loadData( inputFileName  )
+#Read data
+inputDataFrame = None
+if args.query != "" and args.input == "":
+	query = eval( "dict({})".format( args.query ) ) 
+	inputDataFrame = pd.DataFrame( data=query, index=[0] )
+if args.input != "" and args.query == "":
+	inputDataFrame = loadData( inputFileName  )
 
-predictedData  = testModel( Model, inputDataFrame )
+inputDataFrame = processData( inputDataFrame )
 
-if outputFileName == "": 
-	print( predictedData )
-else :
-	predictedData.to_csv( outputFileName, index_label='index', sep=';' )
+if inputDataFrame.size > 1:
+	predictedData  = testModel( Model, inputDataFrame )
+	
+	if outputFileName == "": 
+		print( predictedData )
+	else :
+		predictedData.to_csv( outputFileName, index_label='index', sep=';' )
+

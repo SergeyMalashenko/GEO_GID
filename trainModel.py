@@ -159,12 +159,30 @@ def trainModel( dataFrame, targetColumn, seed ):
 	return clf
 
 def trainNeuralNetworkModel( dataFrame, targetColumn, seed ):
+	import tensorflow as tf
+	
 	import warnings
 	warnings.filterwarnings('ignore')
 	
-	return clf
+	def input_fn(data_set, pred = False):
+		if pred == False:
+			feature_cols = {k: tf.constant(data_set[k].values) for k in FEATURES}
+			labels = tf.constant(data_set[LABEL].values)
+			return feature_cols, labels
+		if pred == True:
+			feature_cols = {k: tf.constant(data_set[k].values) for k in FEATURES}
+			return feature_cols
 
-
+	tf.logging.set_verbosity(tf.logging.ERROR)
+	regressor = tf.contrib.learn.DNNRegressor(feature_columns=feature_cols, activation_fn = tf.nn.relu, hidden_units=[200, 100, 50, 25, 12])
+	
+	regressor.fit          (input_fn=lambda: input_fn(training_set), steps=2000 )	
+	ev = regressor.evaluate(input_fn=lambda: input_fn( testing_set), steps=1    )	
+	
+	loss_score = ev["loss"]
+	print("Final Loss on the testing set: {0:f}".format(loss_score))
+	
+	return regressor
 
 inputFileName = args.input
 modelFileName = args.model
