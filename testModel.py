@@ -60,8 +60,10 @@ inputDataFrame = processData( inputDataFrame )
 if inputDataFrame.size > 1:
 	predictedData  = testModel( Model, inputDataFrame )
 	
-	if outputFileName == "": 
-		print( predictedData )
+	if outputFileName == "":
+		for index, row in predictedData.iterrows():
+			price = row.price
+			print("{:,}".format( int( price ) ) )
 	else :
 		predictedData.to_csv( outputFileName, index_label='index', sep=';' )
 
