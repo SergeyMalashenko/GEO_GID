@@ -26,7 +26,6 @@ MIN_NUMBER_OF_FLOORS = 1     ; MAX_NUMBER_OF_FLOORS = 50       ;
 MIN_LATITUDE         = 56.10 ; MAX_LATITUDE         = 56.50    ;
 MIN_LONGITUDE        = 43.70 ; MAX_LONGITUDE        = 44.30    ;
 
-#MIN_PRICE_PER_SQUARE = 30000 ; MAX_PRICE_PER_SQUARE = 110000;
 def check_float( x ):
 	try:
 		float(x)

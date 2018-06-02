@@ -8,12 +8,13 @@ from sklearn.feature_selection import f_classif, f_regression, SelectKBest, chi2
 from sklearn.ensemble          import IsolationForest
 
 from sklearn.model_selection   import train_test_split
-from sklearn.grid_search       import GridSearchCV
+from sklearn.grid_search       import GridSearchCV, RandomizedSearchCV
 from sklearn.ensemble          import RandomForestRegressor
 from sklearn.metrics           import mean_squared_error, mean_absolute_error, median_absolute_error
 
 from sklearn.preprocessing     import QuantileTransformer
 from sklearn.preprocessing     import LabelEncoder
+from sklearn.tree              import export_graphviz
 
 import pandas            as pd
 import numpy             as np
@@ -22,6 +23,7 @@ import _pickle           as cPickle
 
 import itertools
 import argparse
+import pydot
 
 from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
@@ -48,10 +50,6 @@ def preProcessData( dataFrame, targetColumn, seed ):
 		print("Number of rows without outliers:", dataFrame.shape[0])
 		return dataFrame
 	
-	#def excludeAnomalies( dataFrame, targetColumn ):
-	#return dataFrame
-		
-		
 	def selectFeatures( dataFrame, targetColumn ):
 		index  = dataFrame.index
 		Y_data = dataFrame    [[ targetColumn ]]
@@ -80,11 +78,7 @@ def preProcessData( dataFrame, targetColumn, seed ):
 	dataFrame = excludeAnomalies( dataFrame, targetColumn )
 	dataFrame = selectFeatures  ( dataFrame, targetColumn )
 	
-	for column in dataFrame:
-		min_    = dataFrame[[column]].min   ().values[0]
-		max_    = dataFrame[[column]].max   ().values[0]
-		median_ = dataFrame[[column]].median().values[0]
-		print( "{:30} min={:11}, max={:11}, median={:11}".format( column, min_, max_, median_ ) )
+	print( dataFrame.describe() )
 	
 	return dataFrame
 
@@ -100,13 +94,6 @@ def postProcessData( INDEX_test, X_test, Y_test, Y_predict ) :
 		good_s = np.sum( ( Y_rel_err <= threshold ).astype( np.int ) )
 		print("threshold = {:5}%, good = {:10}, bad = {:10}, err = {:4}".format( threshold, good_s, bad_s, bad_s/(good_s+bad_s)) )
 	
-	"""
-	x =  X_test[:,0]; y = X_test[:,1]; c = np.minimum(  Y_rel_err, 25 );
-	
-	plt.scatter (x, y, c=c )
-	plt.colorbar()
-	plt.show    ()
-	"""
 	mask       = Y_rel_err > 25
 	INDEX_test = INDEX_test[ mask ]
 	X_test     = X_test    [ mask ]
@@ -126,6 +113,15 @@ def postProcessData( INDEX_test, X_test, Y_test, Y_predict ) :
 		y_predict = Y_predict [ i ] 
 		print('{:6} {:10.1f} {:10.1f} {:10.1f}%'.format( index, y_test, y_predict, (y_predict-y_test)*100./y_test ))
 
+def visualizeRandomForestTree( Model ):
+	tree = Model.estimators_[5]
+	# Export the image to a dot file
+	export_graphviz(tree, out_file = 'tree.dot', feature_names = feature_list, rounded = True, precision = 1)
+	# Use dot file to create a graph
+	(graph, ) = pydot.graph_from_dot_file('tree.dot')
+	# Write graph to a png file
+	graph.write_png('tree.png')
+
 def trainModel( dataFrame, targetColumn, seed ):
 	import warnings
 	warnings.filterwarnings('ignore')
@@ -139,13 +135,34 @@ def trainModel( dataFrame, targetColumn, seed ):
 	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
 	Y_values    = Y_values.ravel()
 		
-	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.2, random_state=seed )
+	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.15, random_state=seed )
 	
 	estimator  = RandomForestRegressor()
-	param_grid = {'n_estimators':(24,32,40), 'oob_score':(True,False),'max_features':(2,3,4,5), 'random_state':(seed,) }
+	param_grid = {'n_estimators':(64,), 'oob_score':(True,False),'max_features':(2,3,4,5), 'random_state':(seed,), 'bootstrap': (True, ), 'criterion':('mse',)  }
 	n_jobs     = 3
-		
-	clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=3 )
+	
+	trainDataFrame   = dataFrame.loc[ INDEX_train ]
+	priceTrain       = trainDataFrame.price
+	totalSquareTrain = trainDataFrame.total_square
+	
+	sample_weight        = np.ones( len( trainDataFrame.index ) )
+	pricePerSquareValues = priceTrain.values/totalSquareTrain.values
+	pricePerSquareMedian = np.median( pricePerSquareValues )
+	pricePerSquareMean   = np.mean  ( pricePerSquareValues )
+
+	#sample_weight        = sample_weight
+	#sample_weight        = sample_weight + np.abs(pricePerSquareValues-pricePerSquareMean)/pricePerSquareMean
+	#sample_weight        = sample_weight + np.square( (pricePerSquareValues-pricePerSquareMean)/pricePerSquareMean )
+	#hist_values, bin_edges = np.histogram( pricePerSquareValues )
+	#hist_values = hist_values/np.sum( hist_values )
+	#for i in range( pricePerSquareValues.size ):
+	#	Value = pricePerSquareValues[i]
+	#	for j in range( bin_edges.size - 1):
+	#		if bin_edges[j+0] < Value and Value <= bin_edges[j+1] :
+	#			sample_weight[i] = hist_values[j]
+	
+	clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=3, fit_params={'sample_weight': sample_weight} )
+	#clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=3 )
 	clf.fit( X_train, Y_train ); print( clf.best_params_ )
 	Y_predict = clf.predict( X_test )
 	
@@ -154,8 +171,14 @@ def trainModel( dataFrame, targetColumn, seed ):
 	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
 	print( "median_absolute: ", median_absolute_error( Y_test, Y_predict ) )
 	
-	postProcessData( INDEX_test, X_test, Y_test, Y_predict )
+	print( "Importances of different features")
+	Importances = list( clf.best_estimator_.feature_importances_)
+	featureImportances = [(feature, round(importance, 2)) for feature, importance in zip( FEATURES, Importances)]
+	featureImportances = sorted(featureImportances, key = lambda x: x[1], reverse = True)
+	[print('Variable: {:20} Importance: {}'.format(*pair)) for pair in featureImportances];
 	
+	postProcessData( INDEX_test, X_test, Y_test, Y_predict )
+		
 	return clf
 
 def trainNeuralNetworkModel( dataFrame, targetColumn, seed ):

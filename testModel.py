@@ -27,6 +27,7 @@ parser.add_argument("--model" , type=str             )
 parser.add_argument("--input" , type=str, default="" )
 parser.add_argument("--query" , type=str, default="" ) 
 parser.add_argument("--output", type=str, default="" )
+parser.add_argument("--traint", type=str, default="" )
 
 def testModel( Model, dataFrame ):
 	import warnings
@@ -42,6 +43,8 @@ args = parser.parse_args()
 modelFileName  = args.model
 inputFileName  = args.input
 outputFileName = args.output 
+
+#trainFilename  = args.train
 
 #Load a trained model
 Model = None
