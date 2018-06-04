@@ -17,6 +17,7 @@ localhost:8888
 
 Test  model
 ```
-./testModel.py --model model.pkl --input input/NizhnyNovgorod_test.csv
-./testModel.py --model model.pkl --query 'longitude=44.075417, latitude=56.283864, total_square=43.0, living_square=14.0, kitchen_square=11.0, number_of_rooms=1, floor_number=9, number_of_floors=17'
+./testModel.py --model model.pkl --input input/NizhnyNovgorod_test.csv [--dataset input/NizhnyNovgorod_test.csv --tolerance 0.1 ]
+./testModel.py --model model.pkl --query 'longitude=44.075417, latitude=56.283864, total_square=43.0, living_square=14.0, kitchen_square=11.0, number_of_rooms=1, floor_number=9, number_of_floors=17' [--dataset input/NizhnyNovgorod_test.csv --tolerance 0.1 ]
+
 ```
