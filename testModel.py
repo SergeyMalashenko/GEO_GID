@@ -31,13 +31,16 @@ parser.add_argument("--output"   , type=str  , default="" )
 parser.add_argument("--dataset"  , type=str  , default="" )
 parser.add_argument("--tolerance", type=float, default=0  )
 
-def outputClosestItems( inputDataFrame, outputDataFrame, outputColumns=None, outputTolerance=0.1 ):
-	inputColumns = inputDataFrame.columns if outputColumns is None else outputColumns
-	inputValues  = inputDataFrame.values
+def outputClosestItems( inputDataFrame, outputDataFrame, columns=None, tolerance=0.00001 ):
+	columns     = inputDataFrame.columns if columns is None else columns
+	inputValues = inputDataFrame[ columns ].values
 	
-	currentDiff = outputDataFrame.apply( lambda row : np.linalg.norm( ( row[ inputColumns ].values - inputValues )/(row[ inputColumns ].values), ord=np.inf ) , axis=1 )
+	currentDiff = outputDataFrame.apply( lambda row : np.linalg.norm( ( row[ columns ].values - inputValues )/(row[ columns ].values), ord=np.inf ) , axis=1 )
 	currentDiff.sort_values(ascending=True, inplace=True)
-	print( outputDataFrame.loc[ currentDiff[ currentDiff < outputTolerance ].index ] )
+	
+	index = currentDiff[ currentDiff < tolerance ].index 
+	with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
+		print( outputDataFrame.loc[ index ] )
 
 def testModel( Model, dataFrame ):
 	import warnings
@@ -83,5 +86,5 @@ if inputDataFrame.size > 1:
 	
 	dataFrame = loadData( dataFileName ) if dataFileName != "" else None
 	if dataFrame.size > 1:
-		outputClosestItems( inputDataFrame, dataFrame )
+		outputClosestItems( inputDataFrame, dataFrame, columns=['latitude','longitude','total_square'], tolerance=dataTolerance )
 

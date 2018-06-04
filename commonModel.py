@@ -62,7 +62,7 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 			pricePerSquare       = ( dataFrame['price']/dataFrame['total_square'] )
 			pricePerSquareValues = pricePerSquare.values
 			
-			robustScaler = RobustScaler(quantile_range=(15, 85) )
+			robustScaler = RobustScaler(quantile_range=(10, 90) )
 			robustScaler.fit( pricePerSquareValues.reshape((-1,1)) )
 			pricePerSquareValues = robustScaler.transform( pricePerSquareValues.reshape((-1,1)) ).reshape(-1)
 			
@@ -77,7 +77,7 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 		fileName, 
 		sep=";",
 		encoding='cp1251', 
-		verbose=True, 
+		#verbose=True, 
 		keep_default_na=False
 	).dropna(how="all")
 
