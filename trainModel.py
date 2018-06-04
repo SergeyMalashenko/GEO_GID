@@ -9,7 +9,6 @@ from sklearn.ensemble          import IsolationForest
 
 from sklearn.model_selection   import train_test_split
 from sklearn.model_selection   import GridSearchCV, RandomizedSearchCV
-#from sklearn.grid_search       import GridSearchCV, RandomizedSearchCV
 from sklearn.ensemble          import RandomForestRegressor
 from sklearn.metrics           import mean_squared_error, mean_absolute_error, median_absolute_error
 
@@ -79,7 +78,8 @@ def preProcessData( dataFrame, targetColumn, seed ):
 	dataFrame = excludeAnomalies( dataFrame, targetColumn )
 	dataFrame = selectFeatures  ( dataFrame, targetColumn )
 	
-	print( dataFrame.describe() )
+	with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
+		print( dataFrame.describe() )
 	
 	return dataFrame
 

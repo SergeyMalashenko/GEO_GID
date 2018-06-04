@@ -88,16 +88,11 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	dataFrame['longitude'] = dataFrame['longitude'].astype(np.float64)
 	dataFrame['latitude' ] = dataFrame['latitude' ].astype(np.float64)
 	
-	#print( dataFrame['type'].unique() )
-	#lb_make = LabelEncoder()
-	#dataFrame['type_code'] = lb_make.fit_transform(dataFrame['type'])
-	#print( dataFrame['type_code'])
-	
-	print('Shape of the data with all features:', dataFrame.shape)
+	#print('Shape of the data with all features:', dataFrame.shape)
 	if COLUMN_TYPE == 'NUMERICAL' :
 		dataFrame = dataFrame.select_dtypes(exclude=['object'])
-	print('Shape of the data with numerical features:', dataFrame.shape)
-	print("List of features contained our dataset:",list( dataFrame.columns ))
+	#print('Shape of the data with numerical features:', dataFrame.shape)
+	#print("List of features contained our dataset:",list( dataFrame.columns ))
 	
 	subset = None
 	if 'price' in dataFrame.columns : 
@@ -105,8 +100,8 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	else :
 		subset=['total_square', 'number_of_rooms', 'longitude', 'latitude' ]	
 	dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
-	print('Shape of the data with numerical features:', dataFrame.shape)
+	#print('Shape of the data with numerical features:', dataFrame.shape)
 	dataFrame = preProcessData( dataFrame )
-	print('Shape of the data with numerical features:', dataFrame.shape)
+	#print('Shape of the data with numerical features:', dataFrame.shape)
 	
 	return dataFrame

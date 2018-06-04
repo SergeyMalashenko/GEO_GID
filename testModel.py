@@ -23,25 +23,25 @@ import types
 from commonModel import processData, loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model"    , type=str               )
-parser.add_argument("--input"    , type=str  , default="" )
-parser.add_argument("--query"    , type=str  , default="" ) 
-parser.add_argument("--output"   , type=str  , default="" )
+parser.add_argument("--model"     , type=str               )
+parser.add_argument("--input"     , type=str  , default="" )
+parser.add_argument("--query"     , type=str  , default="" ) 
+parser.add_argument("--output"    , type=str  , default="" )
 
-parser.add_argument("--dataset"  , type=str  , default="" )
-parser.add_argument("--tolerance", type=float, default=0  )
+parser.add_argument("--dataset"   , type=str  , default="" )
+parser.add_argument("--tolerances", type=str  , default=""  )
 
-def outputClosestItems( inputDataFrame, outputDataFrame, columns=None, tolerance=0.00001 ):
-	columns     = inputDataFrame.columns if columns is None else columns
-	inputValues = inputDataFrame[ columns ].values
-	
-	currentDiff = outputDataFrame.apply( lambda row : np.linalg.norm( ( row[ columns ].values - inputValues )/(row[ columns ].values), ord=np.inf ) , axis=1 )
-	currentDiff.sort_values(ascending=True, inplace=True)
-	
-	index = currentDiff[ currentDiff < tolerance ].index 
-	with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
-		print( outputDataFrame.loc[ index ] )
-
+def outputClosestItems( inputDataFrame, outputDataFrame, columnTolerances ):
+	columns    = list( columnTolerances.keys() )
+	tolerances = list( columnTolerances.values() )
+	for i, inputRow in inputDataFrame[columns].iterrows():
+		inputValues = inputRow.values
+		mask = outputDataFrame.apply( lambda row : np.all( np.abs( row[ columns ].values - inputValues ) < tolerances ), axis=1 )
+		with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
+			print('->')
+			print( inputDataFrame.iloc[ i     ] )
+			print('<-')
+			print( outputDataFrame[ mask ] )
 def testModel( Model, dataFrame ):
 	import warnings
 	warnings.filterwarnings('ignore')
@@ -69,6 +69,10 @@ if args.query != "" and args.input == "":
 if args.input != "" and args.query == "":
 	inputDataFrame = loadData( inputFileName  )
 
+inputTolerances = None
+if args.tolerances != "":
+	inputTolerances = eval( "dict({})".format( args.tolerances ) ) 
+
 inputDataFrame = processData( inputDataFrame )
 
 if inputDataFrame.size > 1:
@@ -82,9 +86,8 @@ if inputDataFrame.size > 1:
 		predictedData.to_csv( outputFileName, index_label='index', sep=';' )
 	
 	dataFileName  = args.dataset
-	dataTolerance = args.tolerance
 	
 	dataFrame = loadData( dataFileName ) if dataFileName != "" else None
 	if dataFrame.size > 1:
-		outputClosestItems( inputDataFrame, dataFrame, columns=['latitude','longitude','total_square'], tolerance=dataTolerance )
+		outputClosestItems( inputDataFrame, dataFrame, inputTolerances )
 
