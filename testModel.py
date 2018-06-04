@@ -7,7 +7,7 @@ from sklearn.feature_selection import f_classif, f_regression, SelectKBest, chi2
 from sklearn.ensemble          import IsolationForest
 
 from sklearn.model_selection   import train_test_split
-from sklearn.grid_search       import GridSearchCV
+from sklearn.model_selection   import GridSearchCV
 from sklearn.ensemble          import RandomForestRegressor
 from sklearn.metrics           import mean_squared_error, mean_absolute_error, median_absolute_error
 
@@ -23,11 +23,21 @@ import types
 from commonModel import processData, loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model" , type=str             )
-parser.add_argument("--input" , type=str, default="" )
-parser.add_argument("--query" , type=str, default="" ) 
-parser.add_argument("--output", type=str, default="" )
-parser.add_argument("--traint", type=str, default="" )
+parser.add_argument("--model"    , type=str               )
+parser.add_argument("--input"    , type=str  , default="" )
+parser.add_argument("--query"    , type=str  , default="" ) 
+parser.add_argument("--output"   , type=str  , default="" )
+
+parser.add_argument("--dataset"  , type=str  , default="" )
+parser.add_argument("--tolerance", type=float, default=0  )
+
+def outputClosestItems( inputDataFrame, outputDataFrame, outputColumns=None, outputTolerance=0.1 ):
+	inputColumns = inputDataFrame.columns if outputColumns is None else outputColumns
+	inputValues  = inputDataFrame.values
+	
+	currentDiff = outputDataFrame.apply( lambda row : np.linalg.norm( ( row[ inputColumns ].values - inputValues )/(row[ inputColumns ].values), ord=np.inf ) , axis=1 )
+	currentDiff.sort_values(ascending=True, inplace=True)
+	print( outputDataFrame.loc[ currentDiff[ currentDiff < outputTolerance ].index ] )
 
 def testModel( Model, dataFrame ):
 	import warnings
@@ -40,11 +50,9 @@ def testModel( Model, dataFrame ):
 
 args = parser.parse_args()
 
-modelFileName  = args.model
-inputFileName  = args.input
-outputFileName = args.output 
-
-#trainFilename  = args.train
+modelFileName   = args.model
+inputFileName   = args.input
+outputFileName  = args.output 
 
 #Load a trained model
 Model = None
@@ -69,4 +77,11 @@ if inputDataFrame.size > 1:
 			print("{:,}".format( int( price ) ) )
 	else :
 		predictedData.to_csv( outputFileName, index_label='index', sep=';' )
+	
+	dataFileName  = args.dataset
+	dataTolerance = args.tolerance
+	
+	dataFrame = loadData( dataFileName ) if dataFileName != "" else None
+	if dataFrame.size > 1:
+		outputClosestItems( inputDataFrame, dataFrame )
 

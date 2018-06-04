@@ -8,7 +8,8 @@ from sklearn.feature_selection import f_classif, f_regression, SelectKBest, chi2
 from sklearn.ensemble          import IsolationForest
 
 from sklearn.model_selection   import train_test_split
-from sklearn.grid_search       import GridSearchCV, RandomizedSearchCV
+from sklearn.model_selection   import GridSearchCV, RandomizedSearchCV
+#from sklearn.grid_search       import GridSearchCV, RandomizedSearchCV
 from sklearn.ensemble          import RandomForestRegressor
 from sklearn.metrics           import mean_squared_error, mean_absolute_error, median_absolute_error
 
