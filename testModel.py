@@ -87,7 +87,8 @@ if inputDataFrame.size > 1:
 	
 	dataFileName  = args.dataset
 	
-	dataFrame = loadData( dataFileName ) if dataFileName != "" else None
-	if dataFrame.size > 1:
-		outputClosestItems( inputDataFrame, dataFrame, inputTolerances )
+	if dataFileName != "" :
+		dataFrame = loadData( dataFileName )
+		if dataFrame.size > 1:
+			outputClosestItems( inputDataFrame, dataFrame, inputTolerances )
 
