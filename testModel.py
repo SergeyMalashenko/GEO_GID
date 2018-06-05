@@ -31,17 +31,22 @@ parser.add_argument("--output"    , type=str  , default="" )
 parser.add_argument("--dataset"   , type=str  , default="" )
 parser.add_argument("--tolerances", type=str  , default=""  )
 
-def outputClosestItems( inputDataFrame, outputDataFrame, columnTolerances ):
+def outputClosestItems( inputDataFrame, outputDataFrame, columnTolerances, fmt='plain' ):
 	columns    = list( columnTolerances.keys() )
 	tolerances = list( columnTolerances.values() )
 	for i, inputRow in inputDataFrame[columns].iterrows():
 		inputValues = inputRow.values
 		mask = outputDataFrame.apply( lambda row : np.all( np.abs( row[ columns ].values - inputValues ) < tolerances ), axis=1 )
-		with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
-			print('->')
-			print( inputDataFrame.iloc[ i     ] )
-			print('<-')
-			print( outputDataFrame[ mask ] )
+		
+		if fmt == 'plain' :
+			with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
+				#print('->')
+				#print( inputDataFrame.iloc[ i     ] )
+				print('<-')
+				print( outputDataFrame[ mask ] )
+		elif fmt == 'json':
+			print( outputDataFrame[ mask ].to_json( orient='index') )
+
 def testModel( Model, dataFrame ):
 	import warnings
 	warnings.filterwarnings('ignore')
@@ -90,5 +95,5 @@ if inputDataFrame.size > 1:
 	if dataFileName != "" :
 		dataFrame = loadData( dataFileName )
 		if dataFrame.size > 1:
-			outputClosestItems( inputDataFrame, dataFrame, inputTolerances )
+			outputClosestItems( inputDataFrame, dataFrame, inputTolerances, fmt='json' )
 

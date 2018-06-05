@@ -28,9 +28,10 @@ import pydot
 from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--input" , type=str             )
-parser.add_argument("--model" , type=str, default="" )
-parser.add_argument("--seed"  , type=int, default=0  )
+parser.add_argument("--input"  , type=str             )
+parser.add_argument("--model"  , type=str, default="" )
+parser.add_argument("--seed"   , type=int, default=0  )
+parser.add_argumnet("--output" , type=str, default="" )
 
 args = parser.parse_args()
 
@@ -45,7 +46,7 @@ def preProcessData( dataFrame, targetColumn, seed ):
 		y_noano[y_noano['Top'] == 1].index.values
 		
 		dataFrame = dataFrame.iloc[y_noano[y_noano['Top'] == 1].index.values]
-		#dataFrame.reset_index(drop = True, inplace = True)
+		
 		print("Number of Outliers:", y_noano[y_noano['Top'] == -1].shape[0])
 		print("Number of rows without outliers:", dataFrame.shape[0])
 		return dataFrame
@@ -208,9 +209,10 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed ):
 	
 	return regressor
 
-inputFileName = args.input
-modelFileName = args.model
-seed          = args.seed
+inputFileName  = args.input
+modelFileName  = args.model
+outputFileName = args.output
+seed           = args.seed
 
 trainDataFrame = loadData      ( inputFileName                 )
 
