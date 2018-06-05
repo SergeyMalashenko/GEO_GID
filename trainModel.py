@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--input"  , type=str             )
 parser.add_argument("--model"  , type=str, default="" )
 parser.add_argument("--seed"   , type=int, default=0  )
-parser.add_argumnet("--output" , type=str, default="" )
+parser.add_argument("--output" , type=str, default="" )
 
 args = parser.parse_args()
 
@@ -83,7 +83,7 @@ def preProcessData( dataFrame, targetColumn, seed ):
 		print( dataFrame.describe() )
 	
 	return dataFrame
-
+"""
 def postProcessData( INDEX_test, X_test, Y_test, Y_predict ) :
 	threshold_s = [2.5, 5.0, 10.0, 15.0 ]
 	
@@ -114,7 +114,7 @@ def postProcessData( INDEX_test, X_test, Y_test, Y_predict ) :
 		y_test    = Y_test    [ i ]
 		y_predict = Y_predict [ i ] 
 		print('{:6} {:10.1f} {:10.1f} {:10.1f}%'.format( index, y_test, y_predict, (y_predict-y_test)*100./y_test ))
-
+"""
 def visualizeRandomForestTree( Model ):
 	tree = Model.estimators_[5]
 	# Export the image to a dot file
@@ -124,7 +124,7 @@ def visualizeRandomForestTree( Model ):
 	# Write graph to a png file
 	graph.write_png('tree.png')
 
-def trainModel( dataFrame, targetColumn, seed ):
+def trainModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 	import warnings
 	warnings.filterwarnings('ignore')
 	
@@ -168,21 +168,31 @@ def trainModel( dataFrame, targetColumn, seed ):
 	clf.fit( X_train, Y_train ); print( clf.best_params_ )
 	Y_predict = clf.predict( X_test )
 	
-	print( "Errors on the validation set" )
-	print( "mean square:     ", mean_squared_error   ( Y_test, Y_predict ) )
-	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
-	print( "median_absolute: ", median_absolute_error( Y_test, Y_predict ) )
-	
 	print( "Importances of different features")
 	Importances = list( clf.best_estimator_.feature_importances_)
 	featureImportances = [(feature, round(importance, 2)) for feature, importance in zip( FEATURES, Importances)]
 	featureImportances = sorted(featureImportances, key = lambda x: x[1], reverse = True)
 	[print('Variable: {:20} Importance: {}'.format(*pair)) for pair in featureImportances];
 	
-	postProcessData( INDEX_test, X_test, Y_test, Y_predict )
-		
-	return clf
+	print( "Errors on the validation set" )
+	print( "mean square:     ", mean_squared_error   ( Y_test, Y_predict ) )
+	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
+	print( "median_absolute: ", median_absolute_error( Y_test, Y_predict ) )
 
+	mask = ( np.abs( Y_predict - Y_test )/Y_test ) > 0.25
+	
+	INDEX_test = INDEX_test[ mask ]
+	X_test     = X_test    [ mask ]
+	Y_test     = Y_test    [ mask ]
+	Y_predict  = Y_predict [ mask ]
+	
+	index_s    = np.argsort( Y_test )
+	INDEX_test = INDEX_test[ index_s ]
+	
+	wrongPredictedDataFrame = dataFrame.loc[ INDEX_test ]
+	wrongPredictedDataFrame['predicted_price'] = pd.Series( Y_predict, index=INDEX_test )
+		
+	return clf, wrongPredictedDataFrame
 def trainNeuralNetworkModel( dataFrame, targetColumn, seed ):
 	import tensorflow as tf
 	
@@ -217,9 +227,19 @@ seed           = args.seed
 trainDataFrame = loadData      ( inputFileName                 )
 
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
-Model          = trainModel    ( trainDataFrame, TARGET_COLUMN, seed )
+TrainedModel, wrongPredictedDataFrame = trainModel    ( trainDataFrame, TARGET_COLUMN, seed )
 
 if modelFileName != "" :
 	with open( modelFileName, 'wb') as fid:
-		cPickle.dump( Model, fid)
+		cPickle.dump( TrainedModel, fid)
 
+if outputFileName != "":
+	wrongPredictedDataFrame.to_csv(
+		outputFileName,
+		sep=";",
+		encoding='cp1251',
+		index=False 
+	)
+else:
+	with pd.option_context('display.max_rows', None, 'display.max_columns', 11, 'display.width', 175 ):
+		print( wrongPredictedDataFrame )

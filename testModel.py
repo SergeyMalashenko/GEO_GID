@@ -45,7 +45,9 @@ def outputClosestItems( inputDataFrame, outputDataFrame, columnTolerances, fmt='
 				print('<-')
 				print( outputDataFrame[ mask ] )
 		elif fmt == 'json':
-			print( outputDataFrame[ mask ].to_json( orient='index') )
+			resultDataFrame = outputDataFrame[ mask ]
+			resultDataFrame['index'] = resultDataFrame.index
+			print( resultDataFrame.to_json( orient='records') )
 
 def testModel( Model, dataFrame ):
 	import warnings
