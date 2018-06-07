@@ -53,6 +53,8 @@ def testModel( Model, dataFrame ):
 	import warnings
 	warnings.filterwarnings('ignore')
 	
+	dataFrame.drop(labels=['floor_number'], axis=1, inplace=True)
+	
 	X_dataFrame = dataFrame; index = X_dataFrame.index; X_values    = X_dataFrame.values; 
 	Y_values = np.array( Model.predict( X_values ) )
 	

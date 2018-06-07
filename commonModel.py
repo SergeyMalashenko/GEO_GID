@@ -96,12 +96,12 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	
 	subset = None
 	if 'price' in dataFrame.columns : 
-		subset=['price', 'total_square', 'number_of_rooms', 'longitude', 'latitude' ]	
+		subset=['price', 'total_square', 'number_of_rooms' ]	
 	else :
-		subset=['total_square', 'number_of_rooms', 'longitude', 'latitude' ]	
+		subset=['total_square', 'number_of_rooms' ]	
 	dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
-	#print('Shape of the data with numerical features:', dataFrame.shape)
+	print('Shape of the data with numerical features:', dataFrame.shape)
 	dataFrame = preProcessData( dataFrame )
-	#print('Shape of the data with numerical features:', dataFrame.shape)
+	print('Shape of the data with numerical features:', dataFrame.shape)
 	
 	return dataFrame

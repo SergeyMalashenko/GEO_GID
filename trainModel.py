@@ -9,12 +9,29 @@ from sklearn.ensemble          import IsolationForest
 
 from sklearn.model_selection   import train_test_split
 from sklearn.model_selection   import GridSearchCV, RandomizedSearchCV
-from sklearn.ensemble          import RandomForestRegressor
+from sklearn.ensemble          import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.metrics           import mean_squared_error, mean_absolute_error, median_absolute_error
+
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
 
 from sklearn.preprocessing     import QuantileTransformer
 from sklearn.preprocessing     import LabelEncoder
+from sklearn.preprocessing     import MinMaxScaler, StandardScaler
+from sklearn.neighbors         import KNeighborsRegressor
 from sklearn.tree              import export_graphviz
+
+from sklearn.svm import SVR
+
+from keras.wrappers.scikit_learn import KerasRegressor
+from sklearn.pipeline            import Pipeline
+
+from keras.models import Sequential
+from keras.layers import Dense, Dropout
+from keras.layers import BatchNormalization 
+
+import keras
+import math
 
 import pandas            as pd
 import numpy             as np
@@ -83,7 +100,6 @@ def preProcessData( dataFrame, targetColumn, seed ):
 		print( dataFrame.describe() )
 	
 	return dataFrame
-"""
 def postProcessData( INDEX_test, X_test, Y_test, Y_predict ) :
 	threshold_s = [2.5, 5.0, 10.0, 15.0 ]
 	
@@ -114,7 +130,7 @@ def postProcessData( INDEX_test, X_test, Y_test, Y_predict ) :
 		y_test    = Y_test    [ i ]
 		y_predict = Y_predict [ i ] 
 		print('{:6} {:10.1f} {:10.1f} {:10.1f}%'.format( index, y_test, y_predict, (y_predict-y_test)*100./y_test ))
-"""
+
 def visualizeRandomForestTree( Model ):
 	tree = Model.estimators_[5]
 	# Export the image to a dot file
@@ -124,7 +140,7 @@ def visualizeRandomForestTree( Model ):
 	# Write graph to a png file
 	graph.write_png('tree.png')
 
-def trainModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
+def trainRandomForestModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 	import warnings
 	warnings.filterwarnings('ignore')
 	
@@ -140,7 +156,7 @@ def trainModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.15, random_state=seed )
 	
 	estimator  = RandomForestRegressor()
-	param_grid = {'n_estimators':(64,), 'oob_score':(True,False),'max_features':(2,3,4,5), 'random_state':(seed,), 'bootstrap': (True, ), 'criterion':('mse',)  }
+	param_grid = {'n_estimators':(256,), 'oob_score':(True,False),'max_features':(2,3,4,5), 'random_state':(seed,), 'bootstrap': (True, ), 'criterion':('mse',)  }
 	n_jobs     = 3
 	
 	trainDataFrame   = dataFrame.loc[ INDEX_train ]
@@ -151,20 +167,8 @@ def trainModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 	pricePerSquareValues = priceTrain.values/totalSquareTrain.values
 	pricePerSquareMedian = np.median( pricePerSquareValues )
 	pricePerSquareMean   = np.mean  ( pricePerSquareValues )
-
-	#sample_weight        = sample_weight
-	#sample_weight        = sample_weight + np.abs(pricePerSquareValues-pricePerSquareMean)/pricePerSquareMean
-	#sample_weight        = sample_weight + np.square( (pricePerSquareValues-pricePerSquareMean)/pricePerSquareMean )
-	#hist_values, bin_edges = np.histogram( pricePerSquareValues )
-	#hist_values = hist_values/np.sum( hist_values )
-	#for i in range( pricePerSquareValues.size ):
-	#	Value = pricePerSquareValues[i]
-	#	for j in range( bin_edges.size - 1):
-	#		if bin_edges[j+0] < Value and Value <= bin_edges[j+1] :
-	#			sample_weight[i] = hist_values[j]
 	
 	clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=3, fit_params={'sample_weight': sample_weight} )
-	#clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=3 )
 	clf.fit( X_train, Y_train ); print( clf.best_params_ )
 	Y_predict = clf.predict( X_test )
 	
@@ -175,49 +179,195 @@ def trainModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 	[print('Variable: {:20} Importance: {}'.format(*pair)) for pair in featureImportances];
 	
 	print( "Errors on the validation set" )
+	print( "model score:     ", clf.score            ( X_test, Y_test    ) )
 	print( "mean square:     ", mean_squared_error   ( Y_test, Y_predict ) )
 	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
 	print( "median_absolute: ", median_absolute_error( Y_test, Y_predict ) )
+	
+	return clf, None
 
-	mask = ( np.abs( Y_predict - Y_test )/Y_test ) > 0.25
-	
-	INDEX_test = INDEX_test[ mask ]
-	X_test     = X_test    [ mask ]
-	Y_test     = Y_test    [ mask ]
-	Y_predict  = Y_predict [ mask ]
-	
-	index_s    = np.argsort( Y_test )
-	INDEX_test = INDEX_test[ index_s ]
-	
-	wrongPredictedDataFrame = dataFrame.loc[ INDEX_test ]
-	wrongPredictedDataFrame['predicted_price'] = pd.Series( Y_predict, index=INDEX_test )
-		
-	return clf, wrongPredictedDataFrame
-def trainNeuralNetworkModel( dataFrame, targetColumn, seed ):
-	import tensorflow as tf
-	
+def trainSubModel( dataFrame, targetColumn, seed ):
 	import warnings
 	warnings.filterwarnings('ignore')
 	
-	def input_fn(data_set, pred = False):
-		if pred == False:
-			feature_cols = {k: tf.constant(data_set[k].values) for k in FEATURES}
-			labels = tf.constant(data_set[LABEL].values)
-			return feature_cols, labels
-		if pred == True:
-			feature_cols = {k: tf.constant(data_set[k].values) for k in FEATURES}
-			return feature_cols
+	FEATURES = list( dataFrame.columns ); FEATURES.remove( targetColumn )
+	COLUMNS  = list( dataFrame.columns );
+	LABEL    = targetColumn;
+	
+	INDEX       = dataFrame.index.values
+	Y_dataFrame = dataFrame    [[ targetColumn ]];       Y_values = Y_dataFrame.values;
+	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
+	Y_values    = Y_values.ravel()
+	
+	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.2, random_state=seed )
+	
+	estimator  = RandomForestRegressor()
+	param_grid = {'n_estimators':(16,32,64,), 'oob_score':(True,False),'max_features':(2,3), 'random_state':(seed,), 'bootstrap': (True, ) }
+	n_jobs = 3
+	clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=4 )
+	
+	clf.fit( X_train, Y_train );
+	Y_predict = clf.predict( X_test )
+	
+	print( "Errors on the validation set" )
+	print( "model score:     ", clf.score            ( X_test, Y_test    ) )
+	print( "mean square:     ", mean_squared_error   ( Y_test, Y_predict ) )
+	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
+	print( "median_absolute: ", median_absolute_error( Y_test, Y_predict ) )
+	
+	postProcessData( INDEX_test, X_test, Y_test, Y_predict ) 
+	return clf, clf.predict( X_values )
 
-	tf.logging.set_verbosity(tf.logging.ERROR)
-	regressor = tf.contrib.learn.DNNRegressor(feature_columns=feature_cols, activation_fn = tf.nn.relu, hidden_units=[200, 100, 50, 25, 12])
+def trainFullModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
+	import warnings
+	warnings.filterwarnings('ignore')
 	
-	regressor.fit          (input_fn=lambda: input_fn(training_set), steps=2000 )	
-	ev = regressor.evaluate(input_fn=lambda: input_fn( testing_set), steps=1    )	
+	FEATURES = list( dataFrame.columns ); FEATURES.remove( targetColumn )
+	COLUMNS  = list( dataFrame.columns );
+	LABEL    = targetColumn;
 	
-	loss_score = ev["loss"]
-	print("Final Loss on the testing set: {0:f}".format(loss_score))
+	subDataFrame                   = dataFrame[['latitude','longitude','number_of_rooms']].copy()
+	subDataFrame['PricePerSquare'] = dataFrame['price']/dataFrame['total_square']
 	
-	return regressor
+	subModelPricePerSquare, PricePerSquare = trainSubModel( subDataFrame, 'PricePerSquare', seed )
+	
+	INDEX    = dataFrame.index.values
+	dataFrame['PricePerSquare'] = PricePerSquare
+	#dataFrame['EstimatedPrice'] = PricePerSquare*dataFrame['total_square']
+	FEATURES = list( dataFrame.columns ); FEATURES.remove( targetColumn )
+	COLUMNS  = list( dataFrame.columns );
+	LABEL    = targetColumn;
+	
+	Y_dataFrame = dataFrame    [[ targetColumn ]];       Y_values = Y_dataFrame.values;
+	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
+	Y_values    = Y_values.ravel()
+		
+	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.15, random_state=seed )
+	
+	estimator  = RandomForestRegressor()
+	param_grid = {'n_estimators':(256,), 'oob_score':(True,False),'max_features':(2,3,4,5), 'random_state':(seed,), 'bootstrap': (True, ), 'criterion':('mse',)  }
+	n_jobs     = 3
+	
+	fullModelPrice = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=4 )
+	fullModelPrice.fit( X_train, Y_train ); print( fullModelPrice.best_params_ )
+	Y_predict = fullModelPrice.predict( X_test )
+	
+	print( "Importances of different features")
+	Importances = list( fullModelPrice.best_estimator_.feature_importances_)
+	featureImportances = [(feature, round(importance, 2)) for feature, importance in zip( FEATURES, Importances)]
+	featureImportances = sorted(featureImportances, key = lambda x: x[1], reverse = True)
+	[print('Variable: {:20} Importance: {}'.format(*pair)) for pair in featureImportances];
+	
+	print( "Errors on the validation set" )
+	print( "model score:     ", fullModelPrice.score ( X_test, Y_test    ) )
+	print( "mean square:     ", mean_squared_error   ( Y_test, Y_predict ) )
+	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
+	print( "median_absolute: ", median_absolute_error( Y_test, Y_predict ) )
+	
+	postProcessData( INDEX_test, X_test, Y_test, Y_predict ) 
+	
+	return fullModelPrice, subModelPricePerSquare, None
+
+def trainGradientBoostingModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
+	import warnings
+	warnings.filterwarnings('ignore')
+	
+	dataFrame.drop(labels=['floor_number'], axis=1, inplace=True)
+	
+	FEATURES = list( dataFrame.columns ); FEATURES.remove( targetColumn )
+	COLUMNS  = list( dataFrame.columns );
+	LABEL    = targetColumn;
+	
+	INDEX       = dataFrame.index.values
+	Y_dataFrame = dataFrame    [[ targetColumn ]];       Y_values = Y_dataFrame.values;
+	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
+	Y_values    = Y_values.ravel()
+		
+	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.15, random_state=seed )
+
+	#clf = GradientBoostingRegressor(n_estimators = 400, max_depth = 15, min_samples_split = 2, learning_rate = 0.1, loss = 'ls')	
+	estimator = GradientBoostingRegressor()	
+	param_grid = {'n_estimators':(400,), 'max_depth':(13,), 'min_samples_split':(2,), 'learning_rate':(0.1,), 'loss':('ls',) }
+	n_jobs     = 1
+	
+	clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=3 )
+	clf.fit( X_train, Y_train );
+	Y_predict = clf.predict( X_test )
+	
+	
+	print( Y_predict )
+	print( Y_test    )
+	
+	print( "Errors on the validation set" )
+	print( "model score:     ", clf.score ( X_test, Y_test    ) )
+	print( "mean square:     ", mean_squared_error   ( Y_test, Y_predict ) )
+	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
+	print( "median_absolute: ", median_absolute_error( Y_test, Y_predict ) )
+	
+	postProcessData( INDEX_test, X_test, Y_test, Y_predict ) 
+	return clf, None
+
+
+
+def trainNeuralNetworkModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
+	dataFrame.drop(['floor_number','number_of_floors'], axis=1, inplace=True )
+	
+	FEATURES = list( dataFrame.columns ); FEATURES.remove( targetColumn )
+	COLUMNS  = list( dataFrame.columns );
+	LABEL    = targetColumn;
+	
+	INDEX       = dataFrame.index.values
+	Y_dataFrame = dataFrame    [[ targetColumn ]];       Y_values = Y_dataFrame.values;
+	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
+	Y_values    = Y_values
+	
+	#preprocessorY = MinMaxScaler()
+	preprocessorY = StandardScaler()
+	preprocessorY.fit( Y_values )
+	#preprocessorX = MinMaxScaler()
+	preprocessorX = StandardScaler()
+	preprocessorX.fit( X_values )
+	
+	Y_values = preprocessorY.transform( Y_values )
+	X_values = preprocessorX.transform( X_values )
+	
+	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.1, random_state=seed )
+	
+	#Create model
+	model = Sequential()
+	model.add( Dense             (   8, input_dim=6, kernel_initializer='normal', activation='tanh' ))
+	model.add( Dense             (   8,              kernel_initializer='normal', activation='tanh' ))
+	model.add( Dense             (   4,              kernel_initializer='normal', activation='tanh' ))
+	model.add( Dense             (   4,              kernel_initializer='normal', activation='tanh' ))
+	model.add( Dense             (   1,              kernel_initializer='normal'                    ))
+	
+	#Compile model
+	sgd  = keras.optimizers.SGD (lr=0.01, momentum=0.0, decay=0.0, nesterov=False  )
+	adam = keras.optimizers.Adam(lr=0.01, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+	model.compile( loss='mse', optimizer=sgd, metrics=['accuracy',] )
+	
+	def scheduler(epoch):
+		initial_lrate = 0.01
+		drop          = 0.5
+		epochs_drop   = 30.0
+		lrate = initial_lrate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
+		print( lrate )
+		return lrate
+	change_lr = keras.callbacks.LearningRateScheduler(scheduler)
+	# Fit the model
+	model.fit(X_train, Y_train, epochs=200, batch_size=20, callbacks=[change_lr,], validation_data=( X_test, Y_test) )
+	# Check the model
+	Y_predict = model.predict( X_test )
+	
+	Y_predict = preprocessorY.inverse_transform( Y_predict )
+	Y_test    = preprocessorY.inverse_transform( Y_test    )
+	
+	print( "Errors on the validation set" )
+	print( "mean square:     ", mean_squared_error   ( Y_test, Y_predict ) )
+	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
+	print( "mean median:     ", median_absolute_error  ( Y_test, Y_predict ) )
+	
+	return model, None
 
 inputFileName  = args.input
 modelFileName  = args.model
@@ -227,7 +377,10 @@ seed           = args.seed
 trainDataFrame = loadData      ( inputFileName                 )
 
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
-TrainedModel, wrongPredictedDataFrame = trainModel    ( trainDataFrame, TARGET_COLUMN, seed )
+#TrainedModel, wrongPredictedDataFrame = trainFullModel            ( trainDataFrame, TARGET_COLUMN, seed )
+TrainedModel, wrongPredictedDataFrame = trainRandomForestModel    ( trainDataFrame, TARGET_COLUMN, seed )
+#TrainedModel, wrongPredictedDataFrame = trainGradientBoostingModel( trainDataFrame, TARGET_COLUMN, seed )
+#TrainedModel, wrongPredictedDataFrame = trainNeuralNetworkModel( trainDataFrame, TARGET_COLUMN, seed )
 
 if modelFileName != "" :
 	with open( modelFileName, 'wb') as fid:
