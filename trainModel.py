@@ -23,14 +23,14 @@ from sklearn.tree              import export_graphviz
 
 from sklearn.svm import SVR
 
-from keras.wrappers.scikit_learn import KerasRegressor
+#from keras.wrappers.scikit_learn import KerasRegressor
 from sklearn.pipeline            import Pipeline
 
-from keras.models import Sequential
-from keras.layers import Dense, Dropout
-from keras.layers import BatchNormalization 
+#from keras.models import Sequential
+#from keras.layers import Dense, Dropout
+#from keras.layers import BatchNormalization 
 
-import keras
+#import keras
 import math
 
 import pandas            as pd
