@@ -44,21 +44,24 @@ def outputClosestItems( inputDataFrame, outputDataFrame, columnTolerances, fmt='
 		mask = outputDataFrame.apply( lambda row : np.all( np.abs( row[ columns ].values - inputValues ) < tolerances ), axis=1 )
 		
 		resultDataFrame = outputDataFrame[ mask ]
-		pricePerSquare  = np.median( resultDataFrame['price']/resultDataFrame['total_square'] )
-		resultPrice     = pricePerSquare*totalSquare 
 		
-		print("{:,}".format( int( resultPrice ) ) )
-		
-		if fmt == 'plain' :
-			with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
-				#print('->')
-				#print( inputDataFrame.iloc[ i     ] )
-				print('<-')
-				print( resultDataFrame )
-		elif fmt == 'json':
-			resultDataFrame['index'] = resultDataFrame.index
-			print( resultDataFrame.to_json( orient='records') )
-	
+		if len( resultDataFrame ) > 0 :	
+			pricePerSquare  = np.median( resultDataFrame['price']/resultDataFrame['total_square'] )
+			resultPrice     = pricePerSquare*totalSquare 
+			
+			print("{:,}".format( int( resultPrice ) ) )
+				
+			if fmt == 'plain' :
+				with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
+					#print('->')
+					#print( inputDataFrame.iloc[ i     ] )
+					print('<-')
+					print( resultDataFrame )
+			elif fmt == 'json':
+				resultDataFrame['index'] = resultDataFrame.index
+				print( resultDataFrame.to_json( orient='records') )
+		else:
+			print("{:,}".format( 0 ) )
 	
 def testModel( Model, dataFrame ):
 	import warnings
