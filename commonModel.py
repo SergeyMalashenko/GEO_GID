@@ -67,7 +67,7 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 			pricePerSquareValues = robustScaler.transform( pricePerSquareValues.reshape((-1,1)) ).reshape(-1)
 			
 			mask = ( pricePerSquareValues > -1 ) & ( pricePerSquareValues  < 1 ) & mask
-			print( 'RobustScaler ', robustScaler.center_, robustScaler.scale_ )
+			#print( 'RobustScaler ', robustScaler.center_, robustScaler.scale_ )
 			
 			dataFrame = dataFrame[ mask ]	
 		
@@ -100,8 +100,8 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	else :
 		subset=['total_square', 'number_of_rooms' ]	
 	dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
-	print('Shape of the data with numerical features:', dataFrame.shape)
+	#print('Shape of the data with numerical features:', dataFrame.shape)
 	dataFrame = preProcessData( dataFrame )
-	print('Shape of the data with numerical features:', dataFrame.shape)
+	#print('Shape of the data with numerical features:', dataFrame.shape)
 	
 	return dataFrame

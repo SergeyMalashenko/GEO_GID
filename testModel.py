@@ -32,23 +32,34 @@ parser.add_argument("--dataset"   , type=str  , default="" )
 parser.add_argument("--tolerances", type=str  , default=""  )
 
 def outputClosestItems( inputDataFrame, outputDataFrame, columnTolerances, fmt='plain' ):
-	columns    = list( columnTolerances.keys() )
-	tolerances = list( columnTolerances.values() )
+	columns     = list( columnTolerances.keys() )
+	tolerances  = list( columnTolerances.values() )
+	
+	totalSquare    = inputDataFrame['total_square'].values[0]
+	pricePerSquare = 0 
+	resultPrice    = 0
+	
 	for i, inputRow in inputDataFrame[columns].iterrows():
 		inputValues = inputRow.values
 		mask = outputDataFrame.apply( lambda row : np.all( np.abs( row[ columns ].values - inputValues ) < tolerances ), axis=1 )
+		
+		resultDataFrame = outputDataFrame[ mask ]
+		pricePerSquare  = np.median( resultDataFrame['price']/resultDataFrame['total_square'] )
+		resultPrice     = pricePerSquare*totalSquare 
+		
+		print("{:,}".format( int( resultPrice ) ) )
 		
 		if fmt == 'plain' :
 			with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
 				#print('->')
 				#print( inputDataFrame.iloc[ i     ] )
 				print('<-')
-				print( outputDataFrame[ mask ] )
+				print( resultDataFrame )
 		elif fmt == 'json':
-			resultDataFrame = outputDataFrame[ mask ]
 			resultDataFrame['index'] = resultDataFrame.index
 			print( resultDataFrame.to_json( orient='records') )
-
+	
+	
 def testModel( Model, dataFrame ):
 	import warnings
 	warnings.filterwarnings('ignore')
@@ -62,9 +73,9 @@ def testModel( Model, dataFrame ):
 
 args = parser.parse_args()
 
-modelFileName   = args.model
-inputFileName   = args.input
-outputFileName  = args.output 
+modelFileName  = args.model
+inputFileName  = args.input
+outputFileName = args.output 
 
 #Load a trained model
 Model = None
