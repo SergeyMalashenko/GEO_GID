@@ -184,132 +184,11 @@ def trainRandomForestModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
 	print( "median_absolute: ", median_absolute_error( Y_test, Y_predict ) )
 	
-	return clf, None
+	return clf, (Y_predict, Y_test)
 
-def trainSubModel( dataFrame, targetColumn, seed ):
-	import warnings
-	warnings.filterwarnings('ignore')
-	
-	FEATURES = list( dataFrame.columns ); FEATURES.remove( targetColumn )
-	COLUMNS  = list( dataFrame.columns );
-	LABEL    = targetColumn;
-	
-	INDEX       = dataFrame.index.values
-	Y_dataFrame = dataFrame    [[ targetColumn ]];       Y_values = Y_dataFrame.values;
-	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
-	
-	preprocessorY = MinMaxScaler()
-	preprocessorY.fit( Y_values )
-	preprocessorX = StandardScaler()
-	preprocessorX.fit( X_values )
-	
-	Y_values = preprocessorY.transform( Y_values )
-	X_values = preprocessorX.transform( X_values )
-	
-	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.2, random_state=seed )
-	
-	#estimator  = RandomForestRegressor()
-	#param_grid = {'n_estimators':(16,32,64,), 'oob_score':(True,False),'max_features':(2,3), 'random_state':(seed,), 'bootstrap': (True, ) }
-	#n_jobs = 3
-	#clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=4 )
-	
-	#Create model
-	model = Sequential()
-	model.add( Dense             (  256, input_dim=2, kernel_initializer='uniform', activation='relu' ))
-	model.add( Dense             (  512,              kernel_initializer='uniform', activation='relu' ))
-	model.add( Dense             (  1024,              kernel_initializer='uniform', activation='relu' ))
-	#model.add( Dense             (  1024,              kernel_initializer='uniform', activation='relu' ))
-	model.add( Dense             (     1  ))
-	#Compile model
-	sgd  = keras.optimizers.SGD (lr=0.01, momentum=0.0, decay=0.0, nesterov=False  )
-	adam = keras.optimizers.Adam(lr=0.01, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-	model.compile( loss='mse', optimizer=sgd, metrics=['accuracy',] )
-	
-	def scheduler(epoch):
-		initial_lrate = 0.01
-		drop          = 0.5
-		epochs_drop   = 10.0
-		lrate = initial_lrate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
-		print( lrate )
-		return lrate
-	change_lr = keras.callbacks.LearningRateScheduler(scheduler)
-	# Fit the model
-	model.fit(X_train, Y_train, epochs=30, batch_size=10, callbacks=[change_lr,], validation_data=( X_test, Y_test) )
-	
-	#clf.fit( X_train, Y_train );
-	Y_predict = model.predict( X_test )
-	
-	print( "Errors on the validation set" )
-	#print( "model score:     ", model.score            ( X_test, Y_test    ) )
-	print( "mean square:     ", mean_squared_error   ( Y_test, Y_predict ) )
-	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
-	print( "median_absolute: ", median_absolute_error( Y_test, Y_predict ) )
-	
-	#postProcessData( INDEX_test, X_test, Y_test, Y_predict ) 
-	return model, ( Y_predict, Y_test ) 
-
-def trainFullModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
-	import warnings
-	warnings.filterwarnings('ignore')
-	
-	FEATURES = list( dataFrame.columns ); FEATURES.remove( targetColumn )
-	COLUMNS  = list( dataFrame.columns );
-	LABEL    = targetColumn;
-	
-	#subDataFrame                   = dataFrame[['latitude','longitude','number_of_rooms']].copy()
-	subDataFrame                   = dataFrame[['latitude','longitude']]
-	subDataFrame['PricePerSquare'] = dataFrame['price']/dataFrame['total_square']
-	
-	subModelPricePerSquare, (Y_predict,Y_test) = trainSubModel( subDataFrame, 'PricePerSquare', seed )
-	
-	plt.plot   ( Y_test, Y_test    )
-	plt.scatter( Y_test, Y_predict )
-	plt.show()
-	
-	return
-	"""
-	INDEX    = dataFrame.index.values
-	dataFrame['PricePerSquare'] = PricePerSquare
-	#dataFrame['EstimatedPrice'] = PricePerSquare*dataFrame['total_square']
-	FEATURES = list( dataFrame.columns ); FEATURES.remove( targetColumn )
-	COLUMNS  = list( dataFrame.columns );
-	LABEL    = targetColumn;
-	
-	Y_dataFrame = dataFrame    [[ targetColumn ]];       Y_values = Y_dataFrame.values;
-	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
-	Y_values    = Y_values.ravel()
-		
-	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.15, random_state=seed )
-	
-	estimator  = RandomForestRegressor()
-	param_grid = {'n_estimators':(256,), 'oob_score':(True,False),'max_features':(2,3,4,5), 'random_state':(seed,), 'bootstrap': (True, ), 'criterion':('mse',)  }
-	n_jobs     = 3
-	
-	fullModelPrice = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=4 )
-	fullModelPrice.fit( X_train, Y_train ); print( fullModelPrice.best_params_ )
-	Y_predict = fullModelPrice.predict( X_test )
-	
-	print( "Importances of different features")
-	Importances = list( fullModelPrice.best_estimator_.feature_importances_)
-	featureImportances = [(feature, round(importance, 2)) for feature, importance in zip( FEATURES, Importances)]
-	featureImportances = sorted(featureImportances, key = lambda x: x[1], reverse = True)
-	[print('Variable: {:20} Importance: {}'.format(*pair)) for pair in featureImportances];
-	
-	print( "Errors on the validation set" )
-	print( "model score:     ", fullModelPrice.score ( X_test, Y_test    ) )
-	print( "mean square:     ", mean_squared_error   ( Y_test, Y_predict ) )
-	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
-	print( "median_absolute: ", median_absolute_error( Y_test, Y_predict ) )
-	
-	postProcessData( INDEX_test, X_test, Y_test, Y_predict ) 
-	
-	return fullModelPrice, subModelPricePerSquare, None
-	"""
 def trainGradientBoostingModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 	import warnings
 	warnings.filterwarnings('ignore')
-	
-	dataFrame.drop(labels=['floor_number'], axis=1, inplace=True)
 	
 	FEATURES = list( dataFrame.columns ); FEATURES.remove( targetColumn )
 	COLUMNS  = list( dataFrame.columns );
@@ -324,7 +203,7 @@ def trainGradientBoostingModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 
 	#clf = GradientBoostingRegressor(n_estimators = 400, max_depth = 15, min_samples_split = 2, learning_rate = 0.1, loss = 'ls')	
 	estimator = GradientBoostingRegressor()	
-	param_grid = {'n_estimators':(400,), 'max_depth':(13,), 'min_samples_split':(2,), 'learning_rate':(0.1,), 'loss':('ls',) }
+	param_grid = {'n_estimators':(500,), 'max_depth':(10,), 'subsample':(0.8,), 'learning_rate':(0.01,) }
 	n_jobs     = 1
 	
 	clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=3 )
@@ -414,12 +293,13 @@ seed           = args.seed
 trainDataFrame = loadData      ( inputFileName                 )
 
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
-#TrainedModel, ( Y_predict, Y_test ) = trainFullModel            ( trainDataFrame, TARGET_COLUMN, seed )
-#TrainedModel, wrongPredictedDataFrame = trainRandomForestModel    ( trainDataFrame, TARGET_COLUMN, seed )
+#TrainedModel, ( Y_predict, Y_test ) = trainRandomForestModel    ( trainDataFrame, TARGET_COLUMN, seed )
 TrainedModel, ( Y_predict, Y_test ) = trainGradientBoostingModel( trainDataFrame, TARGET_COLUMN, seed )
-#TrainedModel, wrongPredictedDataFrame = trainNeuralNetworkModel( trainDataFrame, TARGET_COLUMN, seed )
 
-plt.plot   (    Y_test, Y_test )
+plt.plot   (    Y_test, Y_test, c='blue' )
+#plt.plot   (    Y_test*(1.0 + 0.1*math.sqrt(2.)), Y_test*(1.0 + 0.1*math.sqrt(2.)), c='red'  )
+#plt.plot   (    Y_test*(1.0 - 0.1*math.sqrt(2.)), Y_test*(1.0 - 0.1*math.sqrt(2.)), c='red'  )
+plt.scatter( Y_predict, Y_test )
 plt.scatter( Y_predict, Y_test )
 plt.show()
 
