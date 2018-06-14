@@ -19,6 +19,7 @@ import _pickle           as cPickle
 import itertools
 import argparse
 import types
+import torch
 
 from commonModel import processData, loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
@@ -62,7 +63,36 @@ def outputClosestItems( inputDataFrame, outputDataFrame, columnTolerances, fmt='
 				print( resultDataFrame.to_json( orient='records') )
 		else:
 			print("{:,}".format( 0 ) )
+
+def testNeuralNetworkModel( Model, dataFrame, droppedColumns=[] ):
+	import warnings
+	warnings.filterwarnings('ignore')
 	
+	device = torch.device('cpu')
+	#device = torch.device('cuda') # Uncomment this to run on GPU
+	
+	dataFrame.drop( droppedColumns, axis=1, inplace=True )
+	
+	X_dataFrame = dataFrame; index = X_dataFrame.index; X_numpy = X_dataFrame.values; 
+	
+	preprocessorX = None
+	with open( 'preprocessorX.pkl', 'rb') as fid:
+		preprocessorX = cPickle.load(fid)
+	preprocessorY = None
+	with open( 'preprocessorY.pkl', 'rb') as fid:
+		preprocessorY = cPickle.load(fid)
+	
+	X_numpy = preprocessorX.transform( X_numpy )
+	
+	X_torch = torch.from_numpy( X_numpy.astype( np.float32 ) ).to( device )
+	Y_torch = Model( X_torch )
+	Y_numpy = Y_torch.detach().numpy()
+	Y_numpy = preprocessorY.inverse_transform( Y_numpy )
+	
+	print( Y_torch )
+	
+	return pd.DataFrame(data=Y_numpy, index=index, columns=['price'] )
+
 def testModel( Model, dataFrame ):
 	import warnings
 	warnings.filterwarnings('ignore')
@@ -98,7 +128,8 @@ if args.tolerances != "":
 inputDataFrame = processData( inputDataFrame )
 
 if inputDataFrame.size > 1:
-	predictedData  = testModel( Model, inputDataFrame )
+	#predictedData  = testModel( Model, inputDataFrame )
+	predictedData  = testNeuralNetworkModel( Model, inputDataFrame )
 	
 	if outputFileName == "":
 		for index, row in predictedData.iterrows():

@@ -23,14 +23,8 @@ from sklearn.tree              import export_graphviz
 
 from sklearn.svm import SVR
 
-#from keras.wrappers.scikit_learn import KerasRegressor
 from sklearn.pipeline            import Pipeline
 
-#from keras.models import Sequential
-#from keras.layers import Dense, Dropout
-#from keras.layers import BatchNormalization 
-
-#import keras
 import math
 
 import pandas            as pd
@@ -41,6 +35,7 @@ import _pickle           as cPickle
 import itertools
 import argparse
 import pydot
+import torch
 
 from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
@@ -225,8 +220,8 @@ def trainGradientBoostingModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 	postProcessData( INDEX_test, X_test, Y_test, Y_predict ) 
 	return clf, ( Y_predict, Y_test )
 
-def trainNeuralNetworkModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
-	dataFrame.drop(['floor_number','number_of_floors'], axis=1, inplace=True )
+def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[] ):
+	dataFrame.drop( droppedColumns, axis=1, inplace=True )
 	
 	FEATURES = list( dataFrame.columns ); FEATURES.remove( targetColumn )
 	COLUMNS  = list( dataFrame.columns );
@@ -237,54 +232,83 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
 	Y_values    = Y_values
 	
-	#preprocessorY = MinMaxScaler()
-	preprocessorY = StandardScaler()
+	preprocessorY = MinMaxScaler()
+	#preprocessorY = StandardScaler()
 	preprocessorY.fit( Y_values )
 	#preprocessorX = MinMaxScaler()
 	preprocessorX = StandardScaler()
 	preprocessorX.fit( X_values )
 	
+	with open( 'preprocessorX.pkl', 'wb') as fid:
+		cPickle.dump( preprocessorX, fid)
+	with open( 'preprocessorY.pkl', 'wb') as fid:
+		cPickle.dump( preprocessorY, fid)
+	
 	Y_values = preprocessorY.transform( Y_values )
 	X_values = preprocessorX.transform( X_values )
 	
-	X_train, X_test, Y_train, Y_test, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.1, random_state=seed )
+	X_numpyTrain, X_numpyTest, Y_numpyTrain, Y_numpyTest, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.1, random_state=seed )
+	
+	device = torch.device('cpu')
+	#device = torch.device('cuda') # Uncomment this to run on GPU
+	
+	X_torchTrain = torch.from_numpy( X_numpyTrain.astype( np.float32 ) ).to( device )
+	X_torchTest  = torch.from_numpy( X_numpyTest .astype( np.float32 ) ).to( device )
+	Y_torchTrain = torch.from_numpy( Y_numpyTrain.astype( np.float32 ) ).to( device )
+	Y_torchTest  = torch.from_numpy( Y_numpyTest .astype( np.float32 ) ).to( device )
 	
 	#Create model
-	model = Sequential()
-	model.add( Dense             (   8, input_dim=6, kernel_initializer='normal', activation='tanh' ))
-	model.add( Dense             (   8,              kernel_initializer='normal', activation='tanh' ))
-	model.add( Dense             (   4,              kernel_initializer='normal', activation='tanh' ))
-	model.add( Dense             (   4,              kernel_initializer='normal', activation='tanh' ))
-	model.add( Dense             (   1,              kernel_initializer='normal'                    ))
+	model = torch.nn.Sequential(
+		torch.nn.Linear( X_values.shape[1], 200),
+		torch.nn.ReLU(),
+		torch.nn.Linear(200, 200),
+		torch.nn.ReLU(),
+		torch.nn.Linear(200, 1),
+        ).to(device)
+	loss_fn = torch.nn.MSELoss(size_average=False)
 	
-	#Compile model
-	sgd  = keras.optimizers.SGD (lr=0.01, momentum=0.0, decay=0.0, nesterov=False  )
-	adam = keras.optimizers.Adam(lr=0.01, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-	model.compile( loss='mse', optimizer=sgd, metrics=['accuracy',] )
+	learning_rate = 1e-3
+	batch_size    = 256
+	total_size    = X_numpyTrain.shape[0]
+	for t in range(1000):
+		index_s        = torch.randperm( total_size )
+		
+		X_torchTrain_s = X_torchTrain[ index_s ]
+		Y_torchTrain_s = Y_torchTrain[ index_s ]
+		
+		X_torchTrain_s = torch.split( X_torchTrain, batch_size, dim=0 )
+		Y_torchTrain_s = torch.split( Y_torchTrain, batch_size, dim=0 )
+		
+		for i in range( len(Y_torchTrain_s) ):
+			x = X_torchTrain_s[i]
+			y = Y_torchTrain_s[i]
+			
+			y_pred = model(x)
+			loss   = loss_fn(y_pred, y)
+			print(t, loss.item())
+			
+			model.zero_grad()
+			loss.backward()
+			
+			with torch.no_grad():
+				for param in model.parameters():
+					param.data -= learning_rate * param.grad
+		
+		learning_rate = learning_rate/2 if t%200 == 0 else learning_rate
+	# Check model
+	Y_torchPredict = model( X_torchTest )
+	Y_numpyPredict = Y_torchPredict.detach().numpy()
+	Y_numpyTest    = Y_torchTest   .detach().numpy()
 	
-	def scheduler(epoch):
-		initial_lrate = 0.01
-		drop          = 0.5
-		epochs_drop   = 30.0
-		lrate = initial_lrate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
-		print( lrate )
-		return lrate
-	change_lr = keras.callbacks.LearningRateScheduler(scheduler)
-	# Fit the model
-	model.fit(X_train, Y_train, epochs=200, batch_size=20, callbacks=[change_lr,], validation_data=( X_test, Y_test) )
-	# Check the model
-	Y_predict = model.predict( X_test )
-	
-	Y_predict = preprocessorY.inverse_transform( Y_predict )
-	Y_test    = preprocessorY.inverse_transform( Y_test    )
+	Y_numpyPredict = preprocessorY.inverse_transform( Y_numpyPredict )
+	Y_numpyTest    = preprocessorY.inverse_transform( Y_numpyTest    )
 	
 	print( "Errors on the validation set" )
-	print( "mean square:     ", mean_squared_error   ( Y_test, Y_predict ) )
-	print( "mean absolute:   ", mean_absolute_error  ( Y_test, Y_predict ) )
-	print( "mean median:     ", median_absolute_error  ( Y_test, Y_predict ) )
+	print( "mean square:     ", mean_squared_error    ( Y_numpyTest, Y_numpyPredict ) )
+	print( "mean absolute:   ", mean_absolute_error   ( Y_numpyTest, Y_numpyPredict ) )
+	print( "mean median:     ", median_absolute_error ( Y_numpyTest, Y_numpyPredict ) )
 	
-	return model, None
-
+	return model, ( Y_numpyPredict, Y_numpyTest ) 
 inputFileName  = args.input
 modelFileName  = args.model
 outputFileName = args.output
@@ -294,11 +318,12 @@ trainDataFrame = loadData      ( inputFileName                 )
 
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
 #TrainedModel, ( Y_predict, Y_test ) = trainRandomForestModel    ( trainDataFrame, TARGET_COLUMN, seed )
-TrainedModel, ( Y_predict, Y_test ) = trainGradientBoostingModel( trainDataFrame, TARGET_COLUMN, seed )
+#TrainedModel, ( Y_predict, Y_test ) = trainGradientBoostingModel( trainDataFrame, TARGET_COLUMN, seed )
+TrainedModel, ( Y_predict, Y_test ) = trainNeuralNetworkModel   ( trainDataFrame, TARGET_COLUMN, seed )
 
 plt.plot   (    Y_test, Y_test, c='blue' )
-#plt.plot   (    Y_test*(1.0 + 0.1*math.sqrt(2.)), Y_test*(1.0 + 0.1*math.sqrt(2.)), c='red'  )
-#plt.plot   (    Y_test*(1.0 - 0.1*math.sqrt(2.)), Y_test*(1.0 - 0.1*math.sqrt(2.)), c='red'  )
+plt.plot   (    Y_test, Y_test*(1.0 + 0.1*math.sqrt(2.)), c='red'  )
+plt.plot   (    Y_test, Y_test*(1.0 - 0.1*math.sqrt(2.)), c='red'  )
 plt.scatter( Y_predict, Y_test )
 plt.scatter( Y_predict, Y_test )
 plt.show()
