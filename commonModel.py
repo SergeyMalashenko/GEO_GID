@@ -50,8 +50,8 @@ def processData( dataFrame ) :
 	mask = (dataFrame['floor_number'    ] >= MIN_FLOOR_NUMBER     ) & (dataFrame['floor_number'    ] <= MAX_FLOOR_NUMBER     ) & mask
 	mask = (dataFrame['number_of_floors'] >= MIN_NUMBER_OF_FLOORS ) & (dataFrame['number_of_floors'] <= MAX_NUMBER_OF_FLOORS ) & mask
 	
-	#dataFrame.drop(labels=['kitchen_square','living_square','floor_number'], axis=1, inplace=True)
-	dataFrame.drop(labels=['floor_number'], axis=1, inplace=True)
+	dataFrame.drop(labels=['kitchen_square','living_square','floor_number'], axis=1, inplace=True)
+	#dataFrame.drop(labels=['floor_number'], axis=1, inplace=True)
 	
 	return dataFrame[ mask ]
 

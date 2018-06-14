@@ -270,7 +270,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	learning_rate = 1e-3
 	batch_size    = 256
 	total_size    = X_numpyTrain.shape[0]
-	for t in range(1000):
+	for t in range(2000):
 		index_s        = torch.randperm( total_size )
 		
 		X_torchTrain_s = X_torchTrain[ index_s ]
@@ -285,7 +285,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 			
 			y_pred = model(x)
 			loss   = loss_fn(y_pred, y)
-			print(t, loss.item())
+			print(t, learning_rate, loss.item())
 			
 			model.zero_grad()
 			loss.backward()
@@ -294,7 +294,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 				for param in model.parameters():
 					param.data -= learning_rate * param.grad
 		
-		learning_rate = learning_rate/2 if t%200 == 0 else learning_rate
+		learning_rate = learning_rate/2 if (t+1)%200 == 0 else learning_rate
 	# Check model
 	Y_torchPredict = model( X_torchTest )
 	Y_numpyPredict = Y_torchPredict.detach().numpy()
