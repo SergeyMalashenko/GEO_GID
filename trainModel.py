@@ -35,7 +35,9 @@ import _pickle           as cPickle
 import itertools
 import argparse
 import pydot
+
 import torch
+import torch.optim
 
 from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
@@ -265,9 +267,11 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 		torch.nn.ReLU(),
 		torch.nn.Linear(200, 1),
         ).to(device)
-	loss_fn = torch.nn.MSELoss(size_average=False)
-	
 	learning_rate = 1e-3
+	loss_fn       = torch.nn.MSELoss  ( size_average=False)
+	optimizer     = torch.optim.SGD   ( model.parameters(), lr=learning_rate, momentum=0.9)
+	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=200, gamma=0.5)
+	
 	batch_size    = 256
 	total_size    = X_numpyTrain.shape[0]
 	for t in range(2000):
@@ -279,6 +283,9 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 		X_torchTrain_s = torch.split( X_torchTrain, batch_size, dim=0 )
 		Y_torchTrain_s = torch.split( Y_torchTrain, batch_size, dim=0 )
 		
+		for param_group in optimizer.param_groups:
+			learning_rate = param_group['lr']
+		
 		for i in range( len(Y_torchTrain_s) ):
 			x = X_torchTrain_s[i]
 			y = Y_torchTrain_s[i]
@@ -288,13 +295,15 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 			print(t, learning_rate, loss.item())
 			
 			model.zero_grad()
-			loss.backward()
-			
+			loss.backward  ()
+			optimizer.step ()
+			"""
 			with torch.no_grad():
 				for param in model.parameters():
 					param.data -= learning_rate * param.grad
-		
-		learning_rate = learning_rate/2 if (t+1)%200 == 0 else learning_rate
+			"""
+		#learning_rate = learning_rate/2 if (t+1)%200 == 0 else learning_rate
+		scheduler.step()
 	# Check model
 	Y_torchPredict = model( X_torchTest )
 	Y_numpyPredict = Y_torchPredict.detach().numpy()
