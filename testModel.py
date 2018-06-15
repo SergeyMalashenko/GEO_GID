@@ -89,7 +89,7 @@ def testNeuralNetworkModel( Model, dataFrame, droppedColumns=[] ):
 	Y_numpy = Y_torch.detach().numpy()
 	Y_numpy = preprocessorY.inverse_transform( Y_numpy )
 	
-	print( Y_torch )
+	#print( Y_torch )
 	
 	return pd.DataFrame(data=Y_numpy, index=index, columns=['price'] )
 

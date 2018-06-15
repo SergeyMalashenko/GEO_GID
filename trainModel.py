@@ -41,6 +41,9 @@ import torch.optim
 
 from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
+import matplotlib
+matplotlib.use('Agg')
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--input"  , type=str             )
 parser.add_argument("--model"  , type=str, default="" )
