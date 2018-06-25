@@ -42,7 +42,7 @@ import torch.optim
 from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--input"  , type=str             )
@@ -232,6 +232,8 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	COLUMNS  = list( dataFrame.columns );
 	LABEL    = targetColumn;
 	
+	print( FEATURES )
+	
 	INDEX       = dataFrame.index.values
 	Y_dataFrame = dataFrame    [[ targetColumn ]];       Y_values = Y_dataFrame.values;
 	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
@@ -312,6 +314,11 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	Y_numpyPredict = Y_torchPredict.detach().numpy()
 	Y_numpyTest    = Y_torchTest   .detach().numpy()
 	
+	print( "Errors on the validation set" )
+	print( "mean square:     ", mean_squared_error    ( Y_numpyTest, Y_numpyPredict ) )
+	print( "mean absolute:   ", mean_absolute_error   ( Y_numpyTest, Y_numpyPredict ) )
+	print( "mean median:     ", median_absolute_error ( Y_numpyTest, Y_numpyPredict ) )
+	
 	Y_numpyPredict = preprocessorY.inverse_transform( Y_numpyPredict )
 	Y_numpyTest    = preprocessorY.inverse_transform( Y_numpyTest    )
 	
@@ -331,6 +338,7 @@ trainDataFrame = loadData      ( inputFileName                 )
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
 #TrainedModel, ( Y_predict, Y_test ) = trainRandomForestModel    ( trainDataFrame, TARGET_COLUMN, seed )
 #TrainedModel, ( Y_predict, Y_test ) = trainGradientBoostingModel( trainDataFrame, TARGET_COLUMN, seed )
+
 TrainedModel, ( Y_predict, Y_test ) = trainNeuralNetworkModel   ( trainDataFrame, TARGET_COLUMN, seed )
 
 plt.plot   (    Y_test, Y_test, c='blue' )

@@ -119,7 +119,7 @@ if args.query != "" and args.input == "":
 	inputDataFrame = pd.DataFrame( data=query, index=[0] )
 if args.input != "" and args.query == "":
 	inputDataFrame = loadData( inputFileName  )
-inputDataFrame = inputDataFrame[['longitude','latitude','total_square','living_square','kitchen_square','number_of_rooms','floor_number','number_of_floors']]
+inputDataFrame = inputDataFrame[['longitude','latitude','total_square','living_square','kitchen_square','number_of_rooms','floor_number','number_of_floors','exploitation_start_year']]
 
 inputTolerances = None
 if args.tolerances != "":

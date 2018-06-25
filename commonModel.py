@@ -11,7 +11,8 @@ from sklearn.preprocessing      import Normalizer
 from sklearn.preprocessing.data import QuantileTransformer
 
 FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square']
-INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors' ]
+INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors', 'exploitation_start_year' ]
+#INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors' ]
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
 TARGET_COLUMN =   'price'
 
@@ -34,7 +35,8 @@ def check_float( x ):
 	return True
 
 def check_row( row ):
-	check_float_s = check_float( row.longitude ) and check_float( row.latitude )
+	check_float_s = check_float( row.longitude ) and check_float( row.latitude ) and check_float( row.exploitation_start_year )
+	#check_float_s = check_float( row.longitude ) and check_float( row.latitude ) 
 	return check_float_s
 
 def processData( dataFrame ) :
@@ -50,6 +52,7 @@ def processData( dataFrame ) :
 	mask = (dataFrame['floor_number'    ] >= MIN_FLOOR_NUMBER     ) & (dataFrame['floor_number'    ] <= MAX_FLOOR_NUMBER     ) & mask
 	mask = (dataFrame['number_of_floors'] >= MIN_NUMBER_OF_FLOORS ) & (dataFrame['number_of_floors'] <= MAX_NUMBER_OF_FLOORS ) & mask
 	
+	#dataFrame.drop(labels=['kitchen_square','living_square','floor_number','number_of_floors'], axis=1, inplace=True)
 	dataFrame.drop(labels=['kitchen_square','living_square','floor_number'], axis=1, inplace=True)
 	#dataFrame.drop(labels=['floor_number'], axis=1, inplace=True)
 	
@@ -65,7 +68,7 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 			pricePerSquare       = ( dataFrame['price']/dataFrame['total_square'] )
 			pricePerSquareValues = pricePerSquare.values
 			
-			robustScaler = RobustScaler(quantile_range=(10, 90) )
+			robustScaler = RobustScaler(quantile_range=(15, 85) )
 			robustScaler.fit( pricePerSquareValues.reshape((-1,1)) )
 			pricePerSquareValues = robustScaler.transform( pricePerSquareValues.reshape((-1,1)) ).reshape(-1)
 			
@@ -82,13 +85,14 @@ def loadData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 		#verbose=True, 
 		keep_default_na=False
 	).dropna(how="all")
-
+	
 	if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
 	dataFrame = dataFrame[ dataFrame.apply( check_row  , axis=1 ) ]
 	
-	if 'price' in dataFrame.columns : dataFrame['price' ] = dataFrame['price'    ].astype(np.float64)
-	dataFrame['longitude'] = dataFrame['longitude'].astype(np.float64)
-	dataFrame['latitude' ] = dataFrame['latitude' ].astype(np.float64)
+	if 'price' in dataFrame.columns : dataFrame['price' ] = dataFrame['price'].astype(np.float64)
+	dataFrame['longitude'              ] = dataFrame['longitude'              ].astype(np.float64)
+	dataFrame['latitude'               ] = dataFrame['latitude'               ].astype(np.float64)
+	dataFrame['exploitation_start_year'] = dataFrame['exploitation_start_year'].astype(np.float64)
 	
 	#print('Shape of the data with all features:', dataFrame.shape)
 	if COLUMN_TYPE == 'NUMERICAL' :
