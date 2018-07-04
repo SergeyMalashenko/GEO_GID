@@ -39,7 +39,9 @@ import pydot
 import torch
 import torch.optim
 
-from commonModel import loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
+from commonModel import loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN, QuantileRegressionLoss
+from commonModel import limitDataUsingLimitsFromFilename
+from commonModel import limitDataUsingProcentiles
 
 import matplotlib
 #matplotlib.use('Agg')
@@ -49,6 +51,7 @@ parser.add_argument("--input"  , type=str             )
 parser.add_argument("--model"  , type=str, default="" )
 parser.add_argument("--seed"   , type=int, default=0  )
 parser.add_argument("--output" , type=str, default="" )
+parser.add_argument("--limits" , type=str, default="" )
 
 args = parser.parse_args()
 
@@ -93,8 +96,8 @@ def preProcessData( dataFrame, targetColumn, seed ):
 		dataFrame[ targetColumn ] = Y_values_
 		return dataFrame
 	
-	dataFrame = excludeAnomalies( dataFrame, targetColumn )
-	dataFrame = selectFeatures  ( dataFrame, targetColumn )
+	dataFrame = excludeAnomalies         ( dataFrame, targetColumn )
+	dataFrame = selectFeatures           ( dataFrame, targetColumn )
 	
 	with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
 		print( dataFrame.describe() )
@@ -232,8 +235,6 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	COLUMNS  = list( dataFrame.columns );
 	LABEL    = targetColumn;
 	
-	print( FEATURES )
-	
 	INDEX       = dataFrame.index.values
 	Y_dataFrame = dataFrame    [[ targetColumn ]];       Y_values = Y_dataFrame.values;
 	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
@@ -273,13 +274,17 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 		torch.nn.Linear(200, 1),
         ).to(device)
 	learning_rate = 1e-3
-	loss_fn       = torch.nn.MSELoss  ( size_average=False)
-	optimizer     = torch.optim.SGD   ( model.parameters(), lr=learning_rate, momentum=0.9)
+	#loss_fn       = QuantileRegressionLoss( 0.5 ) 
+	#loss_fn       = torch.nn.MSELoss  ( size_average=False)
+	#loss_fn       = torch.nn.BCELoss  ()
+	loss_fn       = torch.nn.L1Loss  ( )
+	#optimizer     = torch.optim.SGD   ( model.parameters(), lr=learning_rate, momentum=0.9)
+	optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate )
 	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=200, gamma=0.5)
 	
 	batch_size    = 256
 	total_size    = X_numpyTrain.shape[0]
-	for t in range(2000):
+	for t in range(3500):
 		index_s        = torch.randperm( total_size )
 		
 		X_torchTrain_s = X_torchTrain[ index_s ]
@@ -297,7 +302,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 			
 			y_pred = model(x)
 			loss   = loss_fn(y_pred, y)
-			print(t, learning_rate, loss.item())
+			print(t, total_size, learning_rate, loss.item())
 			
 			model.zero_grad()
 			loss.backward  ()
@@ -327,19 +332,27 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	print( "mean absolute:   ", mean_absolute_error   ( Y_numpyTest, Y_numpyPredict ) )
 	print( "mean median:     ", median_absolute_error ( Y_numpyTest, Y_numpyPredict ) )
 	
-	return model, ( Y_numpyPredict, Y_numpyTest ) 
+	modelPacket = dict()
+	modelPacket['model'   ] = model
+	modelPacket['features'] = FEATURES
+	
+	return modelPacket, ( Y_numpyPredict, Y_numpyTest ) 
 inputFileName  = args.input
 modelFileName  = args.model
 outputFileName = args.output
+limitsFileName = args.limits
 seed           = args.seed
 
-trainDataFrame = loadData      ( inputFileName                 )
+trainDataFrame = loadCSVData                     ( inputFileName  )
+trainDataFrame = limitDataUsingLimitsFromFilename( trainDataFrame, limitsFileName )
+trainDataFrame = limitDataUsingProcentiles       ( trainDataFrame )
 
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
+
 #TrainedModel, ( Y_predict, Y_test ) = trainRandomForestModel    ( trainDataFrame, TARGET_COLUMN, seed )
 #TrainedModel, ( Y_predict, Y_test ) = trainGradientBoostingModel( trainDataFrame, TARGET_COLUMN, seed )
 
-TrainedModel, ( Y_predict, Y_test ) = trainNeuralNetworkModel   ( trainDataFrame, TARGET_COLUMN, seed )
+TrainedModelPacket, ( Y_predict, Y_test ) = trainNeuralNetworkModel   ( trainDataFrame, TARGET_COLUMN, seed )
 
 plt.plot   (    Y_test, Y_test, c='blue' )
 plt.plot   (    Y_test, Y_test*(1.0 + 0.1*math.sqrt(2.)), c='red'  )
@@ -350,7 +363,7 @@ plt.show()
 
 if modelFileName != "" :
 	with open( modelFileName, 'wb') as fid:
-		cPickle.dump( TrainedModel, fid)
+		cPickle.dump( TrainedModelPacket, fid)
 
 #if outputFileName != "":
 #	wrongPredictedDataFrame.to_csv(

@@ -21,13 +21,16 @@ import argparse
 import types
 import torch
 
-from commonModel import processData, loadData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
+from commonModel import loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
+from commonModel import limitDataUsingLimitsFromFilename
+from commonModel import limitDataUsingProcentiles
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model"     , type=str               )
 parser.add_argument("--input"     , type=str  , default="" )
 parser.add_argument("--query"     , type=str  , default="" ) 
 parser.add_argument("--output"    , type=str  , default="" )
+parser.add_argument("--limits"    , type=str  , default="" )
 
 parser.add_argument("--dataset"   , type=str  , default="" )
 parser.add_argument("--tolerances", type=str  , default=""  )
@@ -107,29 +110,33 @@ args = parser.parse_args()
 modelFileName  = args.model
 inputFileName  = args.input
 outputFileName = args.output 
+limitsFileName = args.limits
 
 #Load a trained model
-Model = None
+MODEL    = None
+FEATURES = None
 with open( modelFileName, 'rb') as fid:
-	Model = cPickle.load(fid)
+	modelPacket = cPickle.load(fid)
+	MODEL       = modelPacket['model'   ]
+	FEATURES    = modelPacket['features']
 #Read data
 inputDataFrame = None
 if args.query != "" and args.input == "":
 	query = eval( "dict({})".format( args.query ) ) 
 	inputDataFrame = pd.DataFrame( data=query, index=[0] )
 if args.input != "" and args.query == "":
-	inputDataFrame = loadData( inputFileName  )
-inputDataFrame = inputDataFrame[['longitude','latitude','total_square','living_square','kitchen_square','number_of_rooms','floor_number','number_of_floors','exploitation_start_year']]
+	inputDataFrame = loadCSVData( inputFileName  )
 
 inputTolerances = None
 if args.tolerances != "":
 	inputTolerances = eval( "dict({})".format( args.tolerances ) ) 
 
-inputDataFrame = processData( inputDataFrame )
+inputDataFrame = limitDataUsingLimitsFromFilename( inputDataFrame, limitsFileName )
+inputDataFrame = inputDataFrame[FEATURES]
 
 if inputDataFrame.size > 1:
 	#predictedData  = testModel( Model, inputDataFrame )
-	predictedData  = testNeuralNetworkModel( Model, inputDataFrame )
+	predictedData  = testNeuralNetworkModel( MODEL, inputDataFrame )
 	
 	if outputFileName == "":
 		for index, row in predictedData.iterrows():
@@ -141,7 +148,7 @@ if inputDataFrame.size > 1:
 	dataFileName  = args.dataset
 	
 	if dataFileName != "" :
-		dataFrame = loadData( dataFileName )
+		dataFrame = loadCSVData( dataFileName )
 		if dataFrame.size > 1:
 			outputClosestItems( inputDataFrame, dataFrame, inputTolerances, fmt='json' )
 
