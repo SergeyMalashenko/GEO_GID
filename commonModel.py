@@ -27,7 +27,6 @@ def check_float( x ):
 	return True
 
 def check_row( row ):
-	#check_float_s = check_float( row.longitude ) and check_float( row.latitude ) and check_float( row.exploitation_start_year )
 	check_float_s = check_float( row.longitude ) and check_float( row.latitude )
 	if 'exploitation_start_year' in row : check_float_s = check_float_s and check_float( row.exploitation_start_year )
 
@@ -37,8 +36,8 @@ class QuantileRegressionLoss( torch.nn.Module ):
 	def __init__(self, q):
 		super(QuantileRegressionLoss,self).__init__()
 		self.q = q
-	def forward(self, input, target):
-		e = ( input - target )
+	def forward(self, predict, target):
+		e = ( target- predict )
 		result = torch.mean( torch.max( self.q*e, (self.q-1)*e ))
 		return result
 
@@ -88,10 +87,10 @@ def loadCSVData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
 	dataFrame = dataFrame[ dataFrame.apply( check_row  , axis=1 ) ]
 	
-	if 'price'                   in dataFrame.columns :  dataFrame['price'                  ] = dataFrame['price'                  ].astype(np.float64)
-	if 'exploitation_start_year' in dataFrame.columns :  dataFrame['exploitation_start_year'] = dataFrame['exploitation_start_year'].astype(np.float64)
-	dataFrame['longitude' ] = dataFrame['longitude' ].astype(np.float64)
-	dataFrame['latitude'  ] = dataFrame['latitude'  ].astype(np.float64)
+	if 'price'                   in dataFrame.columns :  dataFrame['price'                  ] = dataFrame['price'                  ].astype(np.float32)
+	if 'exploitation_start_year' in dataFrame.columns :  dataFrame['exploitation_start_year'] = dataFrame['exploitation_start_year'].astype(np.float32)
+	dataFrame['longitude' ] = dataFrame['longitude' ].astype(np.float32)
+	dataFrame['latitude'  ] = dataFrame['latitude'  ].astype(np.float32)
 	
 	#print('Shape of the data with all features:', dataFrame.shape)
 	if COLUMN_TYPE == 'NUMERICAL' :

@@ -274,10 +274,10 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 		torch.nn.Linear(200, 1),
         ).to(device)
 	learning_rate = 1e-3
-	#loss_fn       = QuantileRegressionLoss( 0.5 ) 
+	loss_fn       = QuantileRegressionLoss( 0.5 ) 
 	#loss_fn       = torch.nn.MSELoss  ( size_average=False)
 	#loss_fn       = torch.nn.BCELoss  ()
-	loss_fn       = torch.nn.L1Loss  ( )
+	#loss_fn       = torch.nn.L1Loss  ( )
 	#optimizer     = torch.optim.SGD   ( model.parameters(), lr=learning_rate, momentum=0.9)
 	optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate )
 	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=200, gamma=0.5)
@@ -295,34 +295,34 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 		
 		for param_group in optimizer.param_groups:
 			learning_rate = param_group['lr']
-		
+		#Train
 		for i in range( len(Y_torchTrain_s) ):
 			x = X_torchTrain_s[i]
 			y = Y_torchTrain_s[i]
 			
 			y_pred = model(x)
 			loss   = loss_fn(y_pred, y)
-			print(t, total_size, learning_rate, loss.item())
+			#print(t, total_size, learning_rate, loss.item())
 			
 			model.zero_grad()
 			loss.backward  ()
 			optimizer.step ()
-			"""
-			with torch.no_grad():
-				for param in model.parameters():
-					param.data -= learning_rate * param.grad
-			"""
-		#learning_rate = learning_rate/2 if (t+1)%200 == 0 else learning_rate
+		#Test
+		Y_torchPredict = model( X_torchTest )
+		Y_numpyPredict = Y_torchPredict.detach().numpy()
+		Y_numpyTest    = Y_torchTest   .detach().numpy()
+		
+		mean_squared_error_  = mean_squared_error    ( Y_numpyTest, Y_numpyPredict )
+		mean_absolute_error_ = mean_absolute_error   ( Y_numpyTest, Y_numpyPredict )
+		mean_median_error_   = median_absolute_error ( Y_numpyTest, Y_numpyPredict )
+		
+		print( "epoch: {:6d}, mean squared error: {:6.4f}, mean absolute error: {:6.4f}, mean median error: {:6.4f}".format( t, mean_squared_error_, mean_absolute_error_, mean_median_error_ ) )
+		
 		scheduler.step()
 	# Check model
 	Y_torchPredict = model( X_torchTest )
 	Y_numpyPredict = Y_torchPredict.detach().numpy()
 	Y_numpyTest    = Y_torchTest   .detach().numpy()
-	
-	print( "Errors on the validation set" )
-	print( "mean square:     ", mean_squared_error    ( Y_numpyTest, Y_numpyPredict ) )
-	print( "mean absolute:   ", mean_absolute_error   ( Y_numpyTest, Y_numpyPredict ) )
-	print( "mean median:     ", median_absolute_error ( Y_numpyTest, Y_numpyPredict ) )
 	
 	Y_numpyPredict = preprocessorY.inverse_transform( Y_numpyPredict )
 	Y_numpyTest    = preprocessorY.inverse_transform( Y_numpyTest    )
