@@ -42,6 +42,7 @@ import torch.optim
 from commonModel import loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN, QuantileRegressionLoss
 from commonModel import limitDataUsingLimitsFromFilename
 from commonModel import limitDataUsingProcentiles
+from commonModel import ConvolutionalNet, LinearNet
 
 import matplotlib
 #matplotlib.use('Agg')
@@ -247,32 +248,24 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	preprocessorX = StandardScaler()
 	preprocessorX.fit( X_values )
 	
-	with open( 'preprocessorX.pkl', 'wb') as fid:
-		cPickle.dump( preprocessorX, fid)
-	with open( 'preprocessorY.pkl', 'wb') as fid:
-		cPickle.dump( preprocessorY, fid)
-	
 	Y_values = preprocessorY.transform( Y_values )
 	X_values = preprocessorX.transform( X_values )
 	
-	X_numpyTrain, X_numpyTest, Y_numpyTrain, Y_numpyTest, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.1, random_state=seed )
+	X_numpyTrain, X_numpyTest, Y_numpyTrain, Y_numpyTest, INDEX_train, INDEX_test = train_test_split( X_values, Y_values, INDEX, test_size=0.2, random_state=seed )
 	
 	device = torch.device('cpu')
 	#device = torch.device('cuda') # Uncomment this to run on GPU
 	
 	X_torchTrain = torch.from_numpy( X_numpyTrain.astype( np.float32 ) ).to( device )
 	X_torchTest  = torch.from_numpy( X_numpyTest .astype( np.float32 ) ).to( device )
+	
 	Y_torchTrain = torch.from_numpy( Y_numpyTrain.astype( np.float32 ) ).to( device )
 	Y_torchTest  = torch.from_numpy( Y_numpyTest .astype( np.float32 ) ).to( device )
 	
 	#Create model
-	model = torch.nn.Sequential(
-		torch.nn.Linear( X_values.shape[1], 200),
-		torch.nn.ReLU(),
-		torch.nn.Linear(200, 200),
-		torch.nn.ReLU(),
-		torch.nn.Linear(200, 1),
-        ).to(device)
+	#model = ConvolutionalNet().to( device )
+	model = LinearNet().to( device )
+	
 	learning_rate = 1e-3
 	loss_fn       = QuantileRegressionLoss( 0.5 ) 
 	#loss_fn       = torch.nn.MSELoss  ( size_average=False)
@@ -283,40 +276,58 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=200, gamma=0.5)
 	
 	batch_size    = 256
-	total_size    = X_numpyTrain.shape[0]
-	for t in range(3500):
-		index_s        = torch.randperm( total_size )
+	train_size    = X_numpyTrain.shape[0]
+	test_size     = X_numpyTest .shape[0]
+	
+	for t in range(1500):
+		train_index_s  = torch.randperm( train_size )
+		X_torchTrain_s = X_torchTrain[ train_index_s ]
+		Y_torchTrain_s = Y_torchTrain[ train_index_s ]
 		
-		X_torchTrain_s = X_torchTrain[ index_s ]
-		Y_torchTrain_s = Y_torchTrain[ index_s ]
+		test_index_s   = torch.randperm( test_size )
+		X_torchTest_s  = X_torchTest [ test_index_s ]
+		Y_torchTest_s  = Y_torchTest [ test_index_s ]
 		
 		X_torchTrain_s = torch.split( X_torchTrain, batch_size, dim=0 )
 		Y_torchTrain_s = torch.split( Y_torchTrain, batch_size, dim=0 )
 		
+		X_torchTest_s  = torch.split( X_torchTest , batch_size, dim=0 )
+		Y_torchTest_s  = torch.split( Y_torchTest , batch_size, dim=0 )
+		
 		for param_group in optimizer.param_groups:
 			learning_rate = param_group['lr']
 		#Train
-		for i in range( len(Y_torchTrain_s) ):
+		for i in range( len(Y_torchTrain_s)-1 ):
 			x = X_torchTrain_s[i]
 			y = Y_torchTrain_s[i]
 			
 			y_pred = model(x)
 			loss   = loss_fn(y_pred, y)
-			#print(t, total_size, learning_rate, loss.item())
 			
 			model.zero_grad()
 			loss.backward  ()
 			optimizer.step ()
 		#Test
-		Y_torchPredict = model( X_torchTest )
+		loss_ = 0
+		Y_torchPredict   = torch.zeros( Y_torchTest.shape, dtype=torch.float32 ).to( device )
+		Y_torchPredict_s = torch.split( Y_torchPredict, batch_size, dim=0 )
+		for i in range( len(Y_torchPredict_s)-1 ):
+			x      = X_torchTest_s[i]
+			y      = Y_torchTest_s[i]
+			y_pred = model(x) 
+			
+			Y_torchPredict_s[i].copy_( y_pred )
+			loss_ += loss_fn( y_pred, y )
+		loss_ /= (len(Y_torchPredict_s)-1) 
+		
 		Y_numpyPredict = Y_torchPredict.detach().numpy()
-		Y_numpyTest    = Y_torchTest   .detach().numpy()
 		
-		mean_squared_error_  = mean_squared_error    ( Y_numpyTest, Y_numpyPredict )
-		mean_absolute_error_ = mean_absolute_error   ( Y_numpyTest, Y_numpyPredict )
-		mean_median_error_   = median_absolute_error ( Y_numpyTest, Y_numpyPredict )
+		length = (len(Y_torchPredict_s)-1)*batch_size
+		mean_squared_error_  = mean_squared_error    ( Y_numpyTest[:length], Y_numpyPredict[:length] )
+		mean_absolute_error_ = mean_absolute_error   ( Y_numpyTest[:length], Y_numpyPredict[:length] )
+		mean_median_error_   = median_absolute_error ( Y_numpyTest[:length], Y_numpyPredict[:length] )
 		
-		print( "epoch: {:6d}, mean squared error: {:6.4f}, mean absolute error: {:6.4f}, mean median error: {:6.4f}".format( t, mean_squared_error_, mean_absolute_error_, mean_median_error_ ) )
+		print( "epoch: {:6d}, loss: {:6.4f}, mean squared error: {:6.4f}, mean absolute error: {:6.4f}, mean median error: {:6.4f}".format( t, loss_, mean_squared_error_, mean_absolute_error_, mean_median_error_ ) )
 		
 		scheduler.step()
 	# Check model
@@ -333,8 +344,10 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	print( "mean median:     ", median_absolute_error ( Y_numpyTest, Y_numpyPredict ) )
 	
 	modelPacket = dict()
-	modelPacket['model'   ] = model
-	modelPacket['features'] = FEATURES
+	modelPacket['model'        ] = model
+	modelPacket['features'     ] = FEATURES
+	modelPacket['preprocessorX'] = preprocessorX
+	modelPacket['preprocessorY'] = preprocessorY
 	
 	return modelPacket, ( Y_numpyPredict, Y_numpyTest ) 
 inputFileName  = args.input

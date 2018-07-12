@@ -14,7 +14,7 @@ import json
 import torch
 import torch.optim
 
-FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square']
+FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square', 'distance_from_metro']
 INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors', 'exploitation_start_year' ]
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
 TARGET_COLUMN =   'price'
@@ -29,6 +29,7 @@ def check_float( x ):
 def check_row( row ):
 	check_float_s = check_float( row.longitude ) and check_float( row.latitude )
 	if 'exploitation_start_year' in row : check_float_s = check_float_s and check_float( row.exploitation_start_year )
+	if 'distance_from_metro'     in row : check_float_s = check_float_s and check_float( row.distance_from_metro     )
 
 	return check_float_s
 
@@ -54,8 +55,46 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 	dataFrame = dataFrame[ mask ]
 	
 	dataFrame.drop(labels=['kitchen_square','living_square','floor_number'], axis=1, inplace=True)
-		
+	if 'id' in dataFrame.columns : dataFrame.drop(labels=['id',], axis=1, inplace=True )	
+	
 	return dataFrame
+
+# Neural network models	
+class LinearNet(torch.nn.Module):
+	def __init__(self):
+		super( LinearNet, self).__init__()
+		self.fc1 = torch.nn.Linear(  7, 200); torch.nn.init.xavier_uniform_( self.fc1.weight );
+		self.fc2 = torch.nn.Linear(200, 200); torch.nn.init.xavier_uniform_( self.fc2.weight );
+		self.fc3 = torch.nn.Linear(200,   1); torch.nn.init.xavier_uniform_( self.fc3.weight );
+		
+	def forward(self, x):
+		x = torch.nn.functional.relu( self.fc1(x) )
+		x = torch.nn.functional.relu( self.fc2(x) )
+		x = self.fc3(x)
+		return x
+
+class ConvolutionalNet(torch.nn.Module):
+	def __init__(self):
+		super( ConvolutionalNet, self).__init__()
+		self.conv1 = torch.nn.Conv1d(1,  64, 3); torch.nn.init.xavier_uniform_( self.conv1.weight );
+		self.conv2 = torch.nn.Conv1d(64, 32, 3); torch.nn.init.xavier_uniform_( self.conv1.weight );
+		
+		self.fc1   = torch.nn.Linear( 64, 32); torch.nn.init.xavier_uniform_( self.fc1.weight );
+		self.fc2   = torch.nn.Linear( 32, 16); torch.nn.init.xavier_uniform_( self.fc2.weight );
+		self.fc3   = torch.nn.Linear( 16,  1); torch.nn.init.xavier_uniform_( self.fc3.weight );
+	
+	def forward(self, x):
+		x = x.unsqueeze(1)
+		x = torch.nn.functional.relu( self.conv1(x) )
+		x = torch.nn.functional.relu( self.conv2(x) )
+		
+		x = x.view( x.size()[0], -1 )
+		
+		x = torch.nn.functional.relu( self.fc1(x) )
+		#x = self.fc2(x)
+		x = torch.nn.functional.relu( self.fc2(x) )
+		x = self.fc3(x)
+		return x
 
 def limitDataUsingProcentiles( dataFrame ):
 	if 'price' in dataFrame.columns :
@@ -89,6 +128,8 @@ def loadCSVData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	
 	if 'price'                   in dataFrame.columns :  dataFrame['price'                  ] = dataFrame['price'                  ].astype(np.float32)
 	if 'exploitation_start_year' in dataFrame.columns :  dataFrame['exploitation_start_year'] = dataFrame['exploitation_start_year'].astype(np.float32)
+	if 'distance_from_metro'     in dataFrame.columns :  dataFrame['distance_from_metro'    ] = dataFrame['distance_from_metro'    ].astype(np.float32)
+	
 	dataFrame['longitude' ] = dataFrame['longitude' ].astype(np.float32)
 	dataFrame['latitude'  ] = dataFrame['latitude'  ].astype(np.float32)
 	

@@ -25,6 +25,9 @@ from commonModel import loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TA
 from commonModel import limitDataUsingLimitsFromFilename
 from commonModel import limitDataUsingProcentiles
 
+from commonModel import ConvolutionalNet
+from commonModel import LinearNet
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--model"     , type=str               )
 parser.add_argument("--input"     , type=str  , default="" )
@@ -67,7 +70,7 @@ def outputClosestItems( inputDataFrame, outputDataFrame, columnTolerances, fmt='
 		else:
 			print("{:,}".format( 0 ) )
 
-def testNeuralNetworkModel( Model, dataFrame, droppedColumns=[] ):
+def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, droppedColumns=[] ):
 	import warnings
 	warnings.filterwarnings('ignore')
 	
@@ -78,13 +81,6 @@ def testNeuralNetworkModel( Model, dataFrame, droppedColumns=[] ):
 	
 	X_dataFrame = dataFrame; index = X_dataFrame.index; X_numpy = X_dataFrame.values; 
 	
-	preprocessorX = None
-	with open( 'preprocessorX.pkl', 'rb') as fid:
-		preprocessorX = cPickle.load(fid)
-	preprocessorY = None
-	with open( 'preprocessorY.pkl', 'rb') as fid:
-		preprocessorY = cPickle.load(fid)
-	
 	X_numpy = preprocessorX.transform( X_numpy )
 	
 	X_torch = torch.from_numpy( X_numpy.astype( np.float32 ) ).to( device )
@@ -92,15 +88,13 @@ def testNeuralNetworkModel( Model, dataFrame, droppedColumns=[] ):
 	Y_numpy = Y_torch.detach().numpy()
 	Y_numpy = preprocessorY.inverse_transform( Y_numpy )
 	
-	#print( Y_torch )
-	
 	return pd.DataFrame(data=Y_numpy, index=index, columns=['price'] )
 
 def testModel( Model, dataFrame ):
 	import warnings
 	warnings.filterwarnings('ignore')
 	
-	X_dataFrame = dataFrame; index = X_dataFrame.index; X_values    = X_dataFrame.values; 
+	X_dataFrame = dataFrame; index = X_dataFrame.index; X_values    = X_dataFrame.values;
 	Y_values = np.array( Model.predict( X_values ) )
 	
 	return pd.DataFrame(data=Y_values, index=index, columns=['price'] )
@@ -113,12 +107,17 @@ outputFileName = args.output
 limitsFileName = args.limits
 
 #Load a trained model
-MODEL    = None
-FEATURES = None
+MODEL          = None
+FEATURES       = None
+PREPROCESSOR_X = None
+PREPROCESSOR_Y = None
+
 with open( modelFileName, 'rb') as fid:
 	modelPacket = cPickle.load(fid)
-	MODEL       = modelPacket['model'   ]
-	FEATURES    = modelPacket['features']
+	MODEL          = modelPacket['model'        ]
+	FEATURES       = modelPacket['features'     ]
+	PREPROCESSOR_X = modelPacket['preprocessorX']
+	PREPROCESSOR_Y = modelPacket['preprocessorY']
 #Read data
 inputDataFrame = None
 if args.query != "" and args.input == "":
@@ -136,7 +135,7 @@ inputDataFrame = inputDataFrame[FEATURES]
 
 if inputDataFrame.size > 1:
 	#predictedData  = testModel( Model, inputDataFrame )
-	predictedData  = testNeuralNetworkModel( MODEL, inputDataFrame )
+	predictedData  = testNeuralNetworkModel( MODEL, PREPROCESSOR_X, PREPROCESSOR_Y, inputDataFrame )
 	
 	if outputFileName == "":
 		for index, row in predictedData.iterrows():
