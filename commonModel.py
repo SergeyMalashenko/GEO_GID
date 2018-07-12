@@ -63,7 +63,7 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 class LinearNet(torch.nn.Module):
 	def __init__(self):
 		super( LinearNet, self).__init__()
-		self.fc1 = torch.nn.Linear(  7, 200); torch.nn.init.xavier_uniform_( self.fc1.weight );
+		self.fc1 = torch.nn.Linear(  6, 200); torch.nn.init.xavier_uniform_( self.fc1.weight );
 		self.fc2 = torch.nn.Linear(200, 200); torch.nn.init.xavier_uniform_( self.fc2.weight );
 		self.fc3 = torch.nn.Linear(200,   1); torch.nn.init.xavier_uniform_( self.fc3.weight );
 		
