@@ -28,8 +28,8 @@ def check_float( x ):
 
 def check_row( row ):
 	check_float_s = check_float( row.longitude ) and check_float( row.latitude )
-	if 'exploitation_start_year' in row : check_float_s = check_float_s and check_float( row.exploitation_start_year )
-	if 'distance_from_metro'     in row : check_float_s = check_float_s and check_float( row.distance_from_metro     )
+	for columnName in (FLOAT_COLUMNS + INT_COLUMNS):
+		if columnName in row : check_float_s = check_float_s and check_float( row[ columnName ] )
 
 	return check_float_s
 
@@ -46,11 +46,14 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 	limitsData = dict()
 	with open( limitsFileName ) as f:
 		limitsData = json.load(f)
+	
 	mask = True
 	for columnName in limitsData.keys() :
 		MIN_VALUE = limitsData[ columnName ]['min']
 		MAX_VALUE = limitsData[ columnName ]['max']
-		mask = (dataFrame[ columnName ] >= MIN_VALUE ) & (dataFrame[ columnName ] <= MAX_VALUE ) & mask
+		
+		mask = (dataFrame[ columnName ] >= MIN_VALUE ) & mask
+		mask = (dataFrame[ columnName ] <= MAX_VALUE ) & mask
 	
 	dataFrame = dataFrame[ mask ]
 	
@@ -61,9 +64,9 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 
 # Neural network models	
 class LinearNet(torch.nn.Module):
-	def __init__(self):
+	def __init__(self, in_size ):
 		super( LinearNet, self).__init__()
-		self.fc1 = torch.nn.Linear(  6, 200); torch.nn.init.xavier_uniform_( self.fc1.weight );
+		self.fc1 = torch.nn.Linear( in_size, 200); torch.nn.init.xavier_uniform_( self.fc1.weight );
 		self.fc2 = torch.nn.Linear(200, 200); torch.nn.init.xavier_uniform_( self.fc2.weight );
 		self.fc3 = torch.nn.Linear(200,   1); torch.nn.init.xavier_uniform_( self.fc3.weight );
 		
@@ -74,24 +77,24 @@ class LinearNet(torch.nn.Module):
 		return x
 
 class ConvolutionalNet(torch.nn.Module):
-	def __init__(self):
+	def __init__(self, in_size ):
 		super( ConvolutionalNet, self).__init__()
-		self.conv1 = torch.nn.Conv1d(1,  64, 3); torch.nn.init.xavier_uniform_( self.conv1.weight );
-		self.conv2 = torch.nn.Conv1d(64, 32, 3); torch.nn.init.xavier_uniform_( self.conv1.weight );
-		
-		self.fc1   = torch.nn.Linear( 64, 32); torch.nn.init.xavier_uniform_( self.fc1.weight );
-		self.fc2   = torch.nn.Linear( 32, 16); torch.nn.init.xavier_uniform_( self.fc2.weight );
-		self.fc3   = torch.nn.Linear( 16,  1); torch.nn.init.xavier_uniform_( self.fc3.weight );
+		self.conv1 = torch.nn.Conv1d(1,  32, 2); torch.nn.init.xavier_uniform_( self.conv1.weight );
+		#self.conv2 = torch.nn.Conv1d(32, 32, 3); torch.nn.init.xavier_uniform_( self.conv1.weight );
+		self.pool1 = torch.nn.AvgPool1d(2)
+		#self.fc1   = torch.nn.Linear( 160, 150); torch.nn.init.xavier_uniform_( self.fc1.weight );
+		self.fc1   = torch.nn.Linear( 96, 150); torch.nn.init.xavier_uniform_( self.fc1.weight );
+		self.fc2   = torch.nn.Linear( 150, 150); torch.nn.init.xavier_uniform_( self.fc2.weight );
+		self.fc3   = torch.nn.Linear( 150,   1); torch.nn.init.xavier_uniform_( self.fc3.weight );
 	
 	def forward(self, x):
 		x = x.unsqueeze(1)
-		x = torch.nn.functional.relu( self.conv1(x) )
-		x = torch.nn.functional.relu( self.conv2(x) )
+		x = torch.nn.functional.relu( self.pool1( self.conv1(x) ) )
+		#x = torch.nn.functional.relu( self.conv2(x) )
 		
 		x = x.view( x.size()[0], -1 )
 		
 		x = torch.nn.functional.relu( self.fc1(x) )
-		#x = self.fc2(x)
 		x = torch.nn.functional.relu( self.fc2(x) )
 		x = self.fc3(x)
 		return x
@@ -126,12 +129,8 @@ def loadCSVData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
 	dataFrame = dataFrame[ dataFrame.apply( check_row  , axis=1 ) ]
 	
-	if 'price'                   in dataFrame.columns :  dataFrame['price'                  ] = dataFrame['price'                  ].astype(np.float32)
-	if 'exploitation_start_year' in dataFrame.columns :  dataFrame['exploitation_start_year'] = dataFrame['exploitation_start_year'].astype(np.float32)
-	if 'distance_from_metro'     in dataFrame.columns :  dataFrame['distance_from_metro'    ] = dataFrame['distance_from_metro'    ].astype(np.float32)
-	
-	dataFrame['longitude' ] = dataFrame['longitude' ].astype(np.float32)
-	dataFrame['latitude'  ] = dataFrame['latitude'  ].astype(np.float32)
+	for columnName in (FLOAT_COLUMNS + INT_COLUMNS):
+		if columnName in dataFrame.columns : dataFrame[ columnName ] = dataFrame[ columnName ].astype( np.float32 )
 	
 	#print('Shape of the data with all features:', dataFrame.shape)
 	if COLUMN_TYPE == 'NUMERICAL' :
@@ -147,5 +146,10 @@ def loadCSVData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	else :
 		subset=['total_square', 'number_of_rooms' ]	
 	dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
+	#Process floor number
+	mask = True
+	mask = mask & ( dataFrame['floor_number'] == 1                             ) 
+	mask = mask | ( dataFrame['floor_number'] == dataFrame['number_of_floors'] )
+	dataFrame['floor_flag'] = 1; dataFrame[ mask ]['floor_flag'] = 0;
 	
 	return dataFrame

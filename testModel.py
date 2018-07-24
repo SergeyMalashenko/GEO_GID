@@ -126,6 +126,10 @@ if args.query != "" and args.input == "":
 if args.input != "" and args.query == "":
 	inputDataFrame = loadCSVData( inputFileName  )
 
+if 'floor_flag' in FEATURES : 
+	mask = ( inputDataFrame['floor_number'] == 1 ) | ( inputDataFrame['floor_number'] == inputDataFrame['number_of_floors'] )
+	inputDataFrame['floor_flag'] = 1; inputDataFrame[ mask ]['floor_flag'] = 0;
+	
 inputTolerances = None
 if args.tolerances != "":
 	inputTolerances = eval( "dict({})".format( args.tolerances ) ) 

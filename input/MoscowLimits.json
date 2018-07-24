@@ -10,11 +10,15 @@
 	"floor_number"    : 
 		{ "min" : 1     , "max" : 50        },
 	"number_of_floors":
-		{ "min" : 1     , "max" : 50        },
+		{ "min" : 2     , "max" : 50        },
 	
 	"latitude"        : 
 		{ "min" : 55.14 , "max" : 56.05     },
 	"longitude"       : 
-		{ "min" : 36.80 , "max" : 37.92     }  
+		{ "min" : 36.80 , "max" : 37.92     },  
+	"exploitation_start_year" : 
+		{ "min" : 1703  , "max" : 2018      }
+
+
 }
 

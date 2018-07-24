@@ -244,8 +244,8 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	preprocessorY = MinMaxScaler()
 	#preprocessorY = StandardScaler()
 	preprocessorY.fit( Y_values )
-	#preprocessorX = MinMaxScaler()
-	preprocessorX = StandardScaler()
+	preprocessorX = MinMaxScaler()
+	#preprocessorX = StandardScaler()
 	preprocessorX.fit( X_values )
 	
 	Y_values = preprocessorY.transform( Y_values )
@@ -263,23 +263,25 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	Y_torchTest  = torch.from_numpy( Y_numpyTest .astype( np.float32 ) ).to( device )
 	
 	#Create model
-	#model = ConvolutionalNet().to( device )
-	model = LinearNet().to( device )
+	in_size = len( FEATURES )
+	#model = ConvolutionalNet( in_size ).to( device )
+	model = LinearNet( in_size ).to( device )
 	
 	learning_rate = 1e-3
+	#loss_fn       = torch.nn.SmoothL1Loss()
 	loss_fn       = QuantileRegressionLoss( 0.5 ) 
 	#loss_fn       = torch.nn.MSELoss  ( size_average=False)
 	#loss_fn       = torch.nn.BCELoss  ()
 	#loss_fn       = torch.nn.L1Loss  ( )
 	#optimizer     = torch.optim.SGD   ( model.parameters(), lr=learning_rate, momentum=0.9)
 	optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate )
-	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=200, gamma=0.5)
+	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=300, gamma=0.5)
 	
 	batch_size    = 256
 	train_size    = X_numpyTrain.shape[0]
 	test_size     = X_numpyTest .shape[0]
 	
-	for t in range(1500):
+	for t in range(3000):
 		train_index_s  = torch.randperm( train_size )
 		X_torchTrain_s = X_torchTrain[ train_index_s ]
 		Y_torchTrain_s = Y_torchTrain[ train_index_s ]
@@ -338,11 +340,12 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	Y_numpyPredict = preprocessorY.inverse_transform( Y_numpyPredict )
 	Y_numpyTest    = preprocessorY.inverse_transform( Y_numpyTest    )
 	
-	print( "Errors on the validation set" )
-	print( "mean square:     ", mean_squared_error    ( Y_numpyTest, Y_numpyPredict ) )
-	print( "mean absolute:   ", mean_absolute_error   ( Y_numpyTest, Y_numpyPredict ) )
-	print( "mean median:     ", median_absolute_error ( Y_numpyTest, Y_numpyPredict ) )
-	
+	Y_relErr = np.abs( Y_numpyPredict - Y_numpyTest )*100/Y_numpyTest
+	for threshold in [ 2.5, 5.0, 10.0, 15.0 ]:
+		bad_s  = np.sum( ( Y_relErr  > threshold ).astype( np.int ) )
+		good_s = np.sum( ( Y_relErr <= threshold ).astype( np.int ) )
+		print("threshold = {:5}, good = {:10}, bad = {:10}, err = {:4}".format( threshold, good_s, bad_s, bad_s/(good_s+bad_s)) )
+		
 	modelPacket = dict()
 	modelPacket['model'        ] = model
 	modelPacket['features'     ] = FEATURES
