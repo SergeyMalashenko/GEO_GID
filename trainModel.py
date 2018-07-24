@@ -281,7 +281,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	train_size    = X_numpyTrain.shape[0]
 	test_size     = X_numpyTest .shape[0]
 	
-	for t in range(3000):
+	for t in range(10000):
 		train_index_s  = torch.randperm( train_size )
 		X_torchTrain_s = X_torchTrain[ train_index_s ]
 		Y_torchTrain_s = Y_torchTrain[ train_index_s ]
