@@ -19,7 +19,7 @@
 	"exploitation_start_year" : 
 		{ "min" : 1703  , "max" : 2018      },
 	"distance_from_metro"     :
-		{ "min" : 0     , "max" :15000      }
+		{ "min" : 0     , "max" : 2000      }
 
 }
 

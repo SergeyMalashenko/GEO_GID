@@ -262,6 +262,9 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	Y_torchTrain = torch.from_numpy( Y_numpyTrain.astype( np.float32 ) ).to( device )
 	Y_torchTest  = torch.from_numpy( Y_numpyTest .astype( np.float32 ) ).to( device )
 	
+	X_torchTrain_mean = torch.mean( X_torchTrain, 0 )
+	X_torchTest_mean  = torch.mean( X_torchTest , 0 )
+	
 	#Create model
 	in_size = len( FEATURES )
 	#model = ConvolutionalNet( in_size ).to( device )
@@ -281,7 +284,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	train_size    = X_numpyTrain.shape[0]
 	test_size     = X_numpyTest .shape[0]
 	
-	for t in range(10000):
+	for t in range(5000):
 		train_index_s  = torch.randperm( train_size )
 		X_torchTrain_s = X_torchTrain[ train_index_s ]
 		Y_torchTrain_s = Y_torchTrain[ train_index_s ]
@@ -352,6 +355,16 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	modelPacket['preprocessorX'] = preprocessorX
 	modelPacket['preprocessorY'] = preprocessorY
 	
+	#X_numpyTrain_Gradient = model.gradient( X_torchTrain_mean ).detach().numpy()
+	#X_numpyTest_Gradient  = model.gradient( X_torchTest_mean  ).detach().numpy()
+	
+	#print( "Importances of different features")
+	#Importances = list( X_numpyTrain_Gradient )
+	#featureImportances = [(feature, round(importance, 2)) for feature, importance in zip( FEATURES, Importances)]
+	#featureImportances = sorted(featureImportances, key = lambda x: x[1], reverse = True)
+	#[print('Variable: {:30} Importance: {:30}'.format(*pair)) for pair in featureImportances];
+	
+	
 	return modelPacket, ( Y_numpyPredict, Y_numpyTest ) 
 inputFileName  = args.input
 modelFileName  = args.model
@@ -365,8 +378,8 @@ trainDataFrame = limitDataUsingProcentiles       ( trainDataFrame )
 
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
 
-#TrainedModel, ( Y_predict, Y_test ) = trainRandomForestModel    ( trainDataFrame, TARGET_COLUMN, seed )
-#TrainedModel, ( Y_predict, Y_test ) = trainGradientBoostingModel( trainDataFrame, TARGET_COLUMN, seed )
+#TrainedModelPacket, ( Y_predict, Y_test ) = trainRandomForestModel    ( trainDataFrame, TARGET_COLUMN, seed )
+#TrainedModelPacket, ( Y_predict, Y_test ) = trainGradientBoostingModel( trainDataFrame, TARGET_COLUMN, seed )
 
 TrainedModelPacket, ( Y_predict, Y_test ) = trainNeuralNetworkModel   ( trainDataFrame, TARGET_COLUMN, seed )
 

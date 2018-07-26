@@ -58,7 +58,7 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 	dataFrame = dataFrame[ mask ]
 	
 	dataFrame.drop(labels=['kitchen_square','living_square','floor_number'], axis=1, inplace=True)
-	if 'id' in dataFrame.columns : dataFrame.drop(labels=['id',], axis=1, inplace=True )	
+	#if 'id' in dataFrame.columns : dataFrame.drop(labels=['id',], axis=1, inplace=True )	
 	
 	return dataFrame
 
@@ -66,16 +66,28 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 class LinearNet(torch.nn.Module):
 	def __init__(self, in_size ):
 		super( LinearNet, self).__init__()
+		
+		self.in_size = in_size
+		
 		self.fc1 = torch.nn.Linear( in_size, 200); torch.nn.init.xavier_uniform_( self.fc1.weight );
 		self.fc2 = torch.nn.Linear(200, 200); torch.nn.init.xavier_uniform_( self.fc2.weight );
 		self.fc3 = torch.nn.Linear(200,   1); torch.nn.init.xavier_uniform_( self.fc3.weight );
 		
-	def forward(self, x):
-		x = torch.nn.functional.relu( self.fc1(x) )
-		x = torch.nn.functional.relu( self.fc2(x) )
-		x = self.fc3(x)
-		return x
-
+	def forward(self, x0):
+		x1 = torch.nn.functional.relu( self.fc1(x0) )
+		x2 = torch.nn.functional.relu( self.fc2(x1) )
+		x3 = self.fc3(x2)
+		return x3
+	def gradient( self, x ):
+		x0 = torch.tensor( x, requires_grad=True)
+		x1 = torch.nn.functional.relu( self.fc1(x0) )
+		x2 = torch.nn.functional.relu( self.fc2(x1) )
+		x3 = self.fc3(x2)
+		x3.backward()
+		
+		print( x0.grad )
+		return x0.grad
+	 
 class ConvolutionalNet(torch.nn.Module):
 	def __init__(self, in_size ):
 		super( ConvolutionalNet, self).__init__()
@@ -153,3 +165,4 @@ def loadCSVData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	dataFrame['floor_flag'] = 1; dataFrame[ mask ]['floor_flag'] = 0;
 	
 	return dataFrame
+
