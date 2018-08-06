@@ -39,10 +39,10 @@ import pydot
 import torch
 import torch.optim
 
-from commonModel import loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN, QuantileRegressionLoss
+from commonModel import loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN, QuantileRegressionLoss, HuberRegressionLoss
 from commonModel import limitDataUsingLimitsFromFilename
 from commonModel import limitDataUsingProcentiles
-from commonModel import ConvolutionalNet, LinearNet
+from commonModel import LinearNet
 
 import matplotlib
 #matplotlib.use('Agg')
@@ -50,7 +50,7 @@ import matplotlib
 parser = argparse.ArgumentParser()
 parser.add_argument("--input"  , type=str             )
 parser.add_argument("--model"  , type=str, default="" )
-parser.add_argument("--seed"   , type=int, default=0  )
+parser.add_argument("--seed"   , type=int, default=43 )
 parser.add_argument("--output" , type=str, default="" )
 parser.add_argument("--limits" , type=str, default="" )
 
@@ -134,7 +134,7 @@ def postProcessData( INDEX_test, X_test, Y_test, Y_predict ) :
 		y_test    = Y_test    [ i ]
 		y_predict = Y_predict [ i ] 
 		print('{:6} {:10.1f} {:10.1f} {:10.1f}%'.format( index, y_test, y_predict, (y_predict-y_test)*100./y_test ))
-
+"""
 def visualizeRandomForestTree( Model ):
 	tree = Model.estimators_[5]
 	# Export the image to a dot file
@@ -143,7 +143,7 @@ def visualizeRandomForestTree( Model ):
 	(graph, ) = pydot.graph_from_dot_file('tree.dot')
 	# Write graph to a png file
 	graph.write_png('tree.png')
-
+"""
 def trainRandomForestModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 	import warnings
 	warnings.filterwarnings('ignore')
@@ -207,7 +207,7 @@ def trainGradientBoostingModel( dataFrame, targetColumn, seed, tolerance=0.25 ):
 
 	#clf = GradientBoostingRegressor(n_estimators = 400, max_depth = 15, min_samples_split = 2, learning_rate = 0.1, loss = 'ls')	
 	estimator = GradientBoostingRegressor()	
-	param_grid = {'n_estimators':(500,), 'max_depth':(10,), 'subsample':(0.8,), 'learning_rate':(0.01,) }
+	param_grid = {'n_estimators':(500,), 'max_depth':(10,), 'subsample':(0.8,), 'learning_rate':(0.05,) }
 	n_jobs     = 1
 	
 	clf = GridSearchCV( estimator, param_grid, n_jobs=n_jobs, cv=3 )
@@ -270,15 +270,15 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	#model = ConvolutionalNet( in_size ).to( device )
 	model = LinearNet( in_size ).to( device )
 	
-	learning_rate = 1e-3
+	learning_rate = 0.001
 	#loss_fn       = torch.nn.SmoothL1Loss()
 	loss_fn       = QuantileRegressionLoss( 0.5 ) 
+	#loss_fn       = HuberRegressionLoss( 0.15 ) 
 	#loss_fn       = torch.nn.MSELoss  ( size_average=False)
-	#loss_fn       = torch.nn.BCELoss  ()
 	#loss_fn       = torch.nn.L1Loss  ( )
 	#optimizer     = torch.optim.SGD   ( model.parameters(), lr=learning_rate, momentum=0.9)
 	optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate )
-	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=300, gamma=0.5)
+	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=300, gamma=0.1)
 	
 	batch_size    = 256
 	train_size    = X_numpyTrain.shape[0]
@@ -355,16 +355,14 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	modelPacket['preprocessorX'] = preprocessorX
 	modelPacket['preprocessorY'] = preprocessorY
 	
-	#X_numpyTrain_Gradient = model.gradient( X_torchTrain_mean ).detach().numpy()
-	#X_numpyTest_Gradient  = model.gradient( X_torchTest_mean  ).detach().numpy()
+	X_numpyTrain_Gradient = np.abs( model.gradient( X_torchTrain_mean ).detach().numpy() )
+	X_numpyTest_Gradient  = np.abs( model.gradient( X_torchTest_mean  ).detach().numpy() )
 	
-	#print( "Importances of different features")
-	#Importances = list( X_numpyTrain_Gradient )
-	#featureImportances = [(feature, round(importance, 2)) for feature, importance in zip( FEATURES, Importances)]
-	#featureImportances = sorted(featureImportances, key = lambda x: x[1], reverse = True)
-	#[print('Variable: {:30} Importance: {:30}'.format(*pair)) for pair in featureImportances];
-	
-	
+	print( "Importances of different features")
+	Importances = list( X_numpyTest_Gradient )
+	featureImportances = [(feature, round(importance, 2)) for feature, importance in zip( FEATURES, Importances)]
+	featureImportances = sorted(featureImportances, key = lambda x: x[1], reverse = True)
+	[print('Variable: {:30} Importance: {:30}'.format(*pair)) for pair in featureImportances];
 	return modelPacket, ( Y_numpyPredict, Y_numpyTest ) 
 inputFileName  = args.input
 modelFileName  = args.model

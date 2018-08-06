@@ -3,9 +3,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from sklearn.feature_selection import f_classif, f_regression, SelectKBest, chi2
-from sklearn.ensemble          import IsolationForest
-
 from sklearn.model_selection   import train_test_split
 from sklearn.model_selection   import GridSearchCV
 from sklearn.ensemble          import RandomForestRegressor
@@ -20,13 +17,14 @@ import itertools
 import argparse
 import types
 import torch
+import timeit
 
 from commonModel import loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 from commonModel import limitDataUsingLimitsFromFilename
 from commonModel import limitDataUsingProcentiles
 
-from commonModel import ConvolutionalNet
 from commonModel import LinearNet
+from commonModel import ballTreeDistance
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model"     , type=str               )
@@ -35,12 +33,24 @@ parser.add_argument("--query"     , type=str  , default="" )
 parser.add_argument("--output"    , type=str  , default="" )
 parser.add_argument("--limits"    , type=str  , default="" )
 
-parser.add_argument("--dataset"   , type=str  , default="" )
-parser.add_argument("--tolerances", type=str  , default=""  )
+parser.add_argument("--tree"      , type=str  , default="" )
 
-def outputClosestItems( inputDataFrame, outputDataFrame, columnTolerances, fmt='plain' ):
-	columns     = list( columnTolerances.keys() )
-	tolerances  = list( columnTolerances.values() )
+parser.add_argument("--dataset"   , type=str  , default="" )
+parser.add_argument("--tolerances", type=str  , default="" )
+
+
+def findClosestItemsUsingSearchTreeMethod( searchTreeModel, searchTreeFeatures, inputDataFrame, inputTolerances, outputDataFrame ) :
+	tolerance = 0.000; 
+	for feature in searchTreeFeatures : 
+		tolerance = max( tolerance, inputTolerances[ feature ] )
+	
+	numpy_index_s = np.concatenate( searchTreeModel.query_radius( inputDataFrame[ searchTreeFeatures ].values, tolerance ) )
+	numpy_index_s = np.unique( numpy_index_s )
+	list_index_s  = numpy_index_s.tolist()
+	return outputDataFrame.iloc[ list_index_s ]
+def findClosestItemsUsingPlainMethod( inputDataFrame, inputTolerances, outputDataFrame, fmt='json' ) :
+	columns     = list( inputTolerances.keys  () )
+	tolerances  = list( inputTolerances.values() )
 	
 	totalSquare    = inputDataFrame['total_square'].values[0]
 	pricePerSquare = 0 
@@ -57,25 +67,19 @@ def outputClosestItems( inputDataFrame, outputDataFrame, columnTolerances, fmt='
 			resultPrice     = pricePerSquare*totalSquare 
 			
 			print("{:,}".format( int( resultPrice ) ) )
-				
-			if fmt == 'plain' :
-				with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
-					#print('->')
-					#print( inputDataFrame.iloc[ i     ] )
-					print('<-')
-					print( resultDataFrame )
-			elif fmt == 'json':
-				resultDataFrame['index'] = resultDataFrame.index
-				print( resultDataFrame.to_json( orient='records') )
+			
+			resultDataFrame['index'] = resultDataFrame.index
+			print( resultDataFrame.to_json( orient='records') )
 		else:
 			print("{:,}".format( 0 ) )
+	
+	return
 
 def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, droppedColumns=[] ):
 	import warnings
 	warnings.filterwarnings('ignore')
 	
 	device = torch.device('cpu')
-	#device = torch.device('cuda') # Uncomment this to run on GPU
 	
 	dataFrame.drop( droppedColumns, axis=1, inplace=True )
 	
@@ -101,23 +105,28 @@ def testModel( Model, dataFrame ):
 
 args = parser.parse_args()
 
-modelFileName  = args.model
-inputFileName  = args.input
-outputFileName = args.output 
-limitsFileName = args.limits
+modelFileName   = args.model
+inputFileName   = args.input
+outputFileName  = args.output 
+limitsFileName  = args.limits
+treeFileName    = args.tree
+dataFileName    = args.dataset
+inputTolerances = None if args.tolerances == "" else eval( "dict({})".format( args.tolerances ) ) 
 
-#Load a trained model
-MODEL          = None
-FEATURES       = None
-PREPROCESSOR_X = None
-PREPROCESSOR_Y = None
-
+#Load tne model
 with open( modelFileName, 'rb') as fid:
 	modelPacket = cPickle.load(fid)
-	MODEL          = modelPacket['model'        ]
-	FEATURES       = modelPacket['features'     ]
-	PREPROCESSOR_X = modelPacket['preprocessorX']
-	PREPROCESSOR_Y = modelPacket['preprocessorY']
+	REGRESSION_MODEL = modelPacket['model'        ]
+	MODEL_FEATURES   = modelPacket['features'     ]
+	PREPROCESSOR_X   = modelPacket['preprocessorX']
+	PREPROCESSOR_Y   = modelPacket['preprocessorY']
+#Load search tree
+with open( treeFileName, 'rb') as fid:
+	searchTreePacket = cPickle.load(fid)
+	SEARCH_TREE_MODEL    = searchTreePacket['tree'    ] 
+	SEARCH_TREE_FEATURES = searchTreePacket['features']
+	SEARCH_TREE_DATA     = searchTreePacket['data'    ]
+
 #Read data
 inputDataFrame = None
 if args.query != "" and args.input == "":
@@ -125,21 +134,16 @@ if args.query != "" and args.input == "":
 	inputDataFrame = pd.DataFrame( data=query, index=[0] )
 if args.input != "" and args.query == "":
 	inputDataFrame = loadCSVData( inputFileName  )
-
-if 'floor_flag' in FEATURES : 
+if 'floor_flag' in MODEL_FEATURES : 
 	mask = ( inputDataFrame['floor_number'] == 1 ) | ( inputDataFrame['floor_number'] == inputDataFrame['number_of_floors'] )
 	inputDataFrame['floor_flag'] = 1; inputDataFrame[ mask ]['floor_flag'] = 0;
-	
-inputTolerances = None
-if args.tolerances != "":
-	inputTolerances = eval( "dict({})".format( args.tolerances ) ) 
 
 inputDataFrame = limitDataUsingLimitsFromFilename( inputDataFrame, limitsFileName )
-inputDataFrame = inputDataFrame[FEATURES]
+inputDataFrameForModel      = inputDataFrame[ MODEL_FEATURES       ]
+inputDataFrameForSearchTree = inputDataFrame[ SEARCH_TREE_FEATURES ]
 
 if inputDataFrame.size > 1:
-	#predictedData  = testModel( Model, inputDataFrame )
-	predictedData  = testNeuralNetworkModel( MODEL, PREPROCESSOR_X, PREPROCESSOR_Y, inputDataFrame )
+	predictedData  = testNeuralNetworkModel( REGRESSION_MODEL, PREPROCESSOR_X, PREPROCESSOR_Y, inputDataFrameForModel )
 	
 	if outputFileName == "":
 		for index, row in predictedData.iterrows():
@@ -148,10 +152,18 @@ if inputDataFrame.size > 1:
 	else :
 		predictedData.to_csv( outputFileName, index_label='index', sep=';' )
 	
-	dataFileName  = args.dataset
-	
-	if dataFileName != "" :
-		dataFrame = loadCSVData( dataFileName )
-		if dataFrame.size > 1:
-			outputClosestItems( inputDataFrame, dataFrame, inputTolerances, fmt='json' )
-
+	dataFrame = SEARCH_TREE_DATA 
+	dataFrame = findClosestItemsUsingSearchTreeMethod( SEARCH_TREE_MODEL, SEARCH_TREE_FEATURES, inputDataFrame, inputTolerances, dataFrame )
+	dataFrame = findClosestItemsUsingPlainMethod     ( inputDataFrame, inputTolerances, dataFrame )
+	"""
+	if len( dataFrame ) > 0 :	
+			pricePerSquare  = np.median( resultDataFrame['price']/resultDataFrame['total_square'] )
+			resultPrice     = pricePerSquare*totalSquare 
+			
+			print("{:,}".format( int( resultPrice ) ) )
+			
+			resultDataFrame['index'] = resultDataFrame.index
+			print( resultDataFrame.to_json( orient='records') )
+		else:
+			print("{:,}".format( 0 ) )
+	"""

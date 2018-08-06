@@ -19,6 +19,10 @@ INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors', 'exploi
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
 TARGET_COLUMN =   'price'
 
+def ballTreeDistance( X1, X2 ):
+	X1_latitude  = X1[1]; X1_longitude = X1[2]; X2_latitude  = X2[1]; X2_longitude = X2[2];
+	return np.sqrt( (X2_latitude - X1_latitude)**2 + (X2_longitude - X1_longitude)**2 )
+
 def check_float( x ):
 	try:
 		float(x)
@@ -33,6 +37,29 @@ def check_row( row ):
 
 	return check_float_s
 
+#Huber regression
+class HuberRegressionLoss( torch.nn.Module ):
+	def __init__(self, delta):
+		super(HuberRegressionLoss,self).__init__()
+		self.eps   = 0.00001
+		self.delta = delta
+	def forward(self, predict, target):
+		delta = self.delta
+		eps   = self.eps
+		
+		e = ( target - predict )
+		
+		result = torch.zeros( e.size() )
+		
+		mask = torch.abs( e ).le( delta )
+		result[ mask ] = 0.5*(e[ mask ]*e[ mask ]) 
+		
+		mask = torch.abs( e ).gt( delta )
+		result[ mask ] = delta*torch.abs( e[ mask ] ) - 0.5*(delta**2)
+		
+		return torch.mean( result )
+
+#Quantile regression
 class QuantileRegressionLoss( torch.nn.Module ):
 	def __init__(self, q):
 		super(QuantileRegressionLoss,self).__init__()
@@ -70,8 +97,8 @@ class LinearNet(torch.nn.Module):
 		self.in_size = in_size
 		
 		self.fc1 = torch.nn.Linear( in_size, 200); torch.nn.init.xavier_uniform_( self.fc1.weight );
-		self.fc2 = torch.nn.Linear(200, 200); torch.nn.init.xavier_uniform_( self.fc2.weight );
-		self.fc3 = torch.nn.Linear(200,   1); torch.nn.init.xavier_uniform_( self.fc3.weight );
+		self.fc2 = torch.nn.Linear(200, 200);      torch.nn.init.xavier_uniform_( self.fc2.weight );
+		self.fc3 = torch.nn.Linear(200,   1);      torch.nn.init.xavier_uniform_( self.fc3.weight );
 		
 	def forward(self, x0):
 		x1 = torch.nn.functional.relu( self.fc1(x0) )
@@ -85,32 +112,8 @@ class LinearNet(torch.nn.Module):
 		x3 = self.fc3(x2)
 		x3.backward()
 		
-		print( x0.grad )
 		return x0.grad
 	 
-class ConvolutionalNet(torch.nn.Module):
-	def __init__(self, in_size ):
-		super( ConvolutionalNet, self).__init__()
-		self.conv1 = torch.nn.Conv1d(1,  32, 2); torch.nn.init.xavier_uniform_( self.conv1.weight );
-		#self.conv2 = torch.nn.Conv1d(32, 32, 3); torch.nn.init.xavier_uniform_( self.conv1.weight );
-		self.pool1 = torch.nn.AvgPool1d(2)
-		#self.fc1   = torch.nn.Linear( 160, 150); torch.nn.init.xavier_uniform_( self.fc1.weight );
-		self.fc1   = torch.nn.Linear( 96, 150); torch.nn.init.xavier_uniform_( self.fc1.weight );
-		self.fc2   = torch.nn.Linear( 150, 150); torch.nn.init.xavier_uniform_( self.fc2.weight );
-		self.fc3   = torch.nn.Linear( 150,   1); torch.nn.init.xavier_uniform_( self.fc3.weight );
-	
-	def forward(self, x):
-		x = x.unsqueeze(1)
-		x = torch.nn.functional.relu( self.pool1( self.conv1(x) ) )
-		#x = torch.nn.functional.relu( self.conv2(x) )
-		
-		x = x.view( x.size()[0], -1 )
-		
-		x = torch.nn.functional.relu( self.fc1(x) )
-		x = torch.nn.functional.relu( self.fc2(x) )
-		x = self.fc3(x)
-		return x
-
 def limitDataUsingProcentiles( dataFrame ):
 	if 'price' in dataFrame.columns :
 		mask = True
@@ -159,10 +162,11 @@ def loadCSVData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 		subset=['total_square', 'number_of_rooms' ]	
 	dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
 	#Process floor number
-	mask = True
-	mask = mask & ( dataFrame['floor_number'] == 1                             ) 
-	mask = mask | ( dataFrame['floor_number'] == dataFrame['number_of_floors'] )
-	dataFrame['floor_flag'] = 1; dataFrame[ mask ]['floor_flag'] = 0;
+	#dataFrame['floor_flag'] = 0;
+	#mask = ( dataFrame['floor_number'] == 1                             )
+	#dataFrame[ mask ]['floor_flag'] = -1;
+	#mask = ( dataFrame['floor_number'] == dataFrame['number_of_floors'] )
+	#dataFrame[ mask ]['floor_flag'] = 1;
 	
 	return dataFrame
 
