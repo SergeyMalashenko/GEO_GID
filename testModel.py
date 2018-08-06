@@ -29,14 +29,13 @@ from commonModel import ballTreeDistance
 parser = argparse.ArgumentParser()
 parser.add_argument("--model"     , type=str               )
 parser.add_argument("--input"     , type=str  , default="" )
+
 parser.add_argument("--query"     , type=str  , default="" ) 
-parser.add_argument("--output"    , type=str  , default="" )
+parser.add_argument("--tolerances", type=str  , default="" )
+
 parser.add_argument("--limits"    , type=str  , default="" )
 
-parser.add_argument("--tree"      , type=str  , default="" )
-
-parser.add_argument("--dataset"   , type=str  , default="" )
-parser.add_argument("--tolerances", type=str  , default="" )
+parser.add_argument("--dataset_with_tree", type=str  , default="" )
 
 
 def findClosestItemsUsingSearchTreeMethod( searchTreeModel, searchTreeFeatures, inputDataFrame, inputTolerances, outputDataFrame ) :
@@ -107,10 +106,8 @@ args = parser.parse_args()
 
 modelFileName   = args.model
 inputFileName   = args.input
-outputFileName  = args.output 
 limitsFileName  = args.limits
-treeFileName    = args.tree
-dataFileName    = args.dataset
+treeFileName    = args.dataset_with_tree
 inputTolerances = None if args.tolerances == "" else eval( "dict({})".format( args.tolerances ) ) 
 
 #Load tne model
@@ -145,12 +142,9 @@ inputDataFrameForSearchTree = inputDataFrame[ SEARCH_TREE_FEATURES ]
 if inputDataFrame.size > 1:
 	predictedData  = testNeuralNetworkModel( REGRESSION_MODEL, PREPROCESSOR_X, PREPROCESSOR_Y, inputDataFrameForModel )
 	
-	if outputFileName == "":
-		for index, row in predictedData.iterrows():
-			price = row.price
-			print("{:,}".format( int( price ) ) )
-	else :
-		predictedData.to_csv( outputFileName, index_label='index', sep=';' )
+	for index, row in predictedData.iterrows():
+		price = row.price
+		print("{:,}".format( int( price ) ) )
 	
 	dataFrame = SEARCH_TREE_DATA 
 	dataFrame = findClosestItemsUsingSearchTreeMethod( SEARCH_TREE_MODEL, SEARCH_TREE_FEATURES, inputDataFrame, inputTolerances, dataFrame )
