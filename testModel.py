@@ -27,16 +27,13 @@ from commonModel import LinearNet
 from commonModel import ballTreeDistance
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model"     , type=str               )
-parser.add_argument("--input"     , type=str  , default="" )
+parser.add_argument("--model"     , type=str             )
+parser.add_argument("--query"     , type=str             ) 
+parser.add_argument("--tolerances", type=str, default="" )
 
-parser.add_argument("--query"     , type=str  , default="" ) 
-parser.add_argument("--tolerances", type=str  , default="" )
+parser.add_argument("--limits"    , type=str, default="" )
 
-parser.add_argument("--limits"    , type=str  , default="" )
-
-parser.add_argument("--dataset_with_tree", type=str  , default="" )
-
+parser.add_argument("--dataset_with_tree", type=str, default="" )
 
 def findClosestItemsUsingSearchTreeMethod( searchTreeModel, searchTreeFeatures, inputDataFrame, inputTolerances, outputDataFrame ) :
 	tolerance = 0.000; 
@@ -104,8 +101,8 @@ def testModel( Model, dataFrame ):
 
 args = parser.parse_args()
 
+inputQuery      = args.query
 modelFileName   = args.model
-inputFileName   = args.input
 limitsFileName  = args.limits
 treeFileName    = args.dataset_with_tree
 inputTolerances = None if args.tolerances == "" else eval( "dict({})".format( args.tolerances ) ) 
@@ -113,51 +110,51 @@ inputTolerances = None if args.tolerances == "" else eval( "dict({})".format( ar
 #Load tne model
 with open( modelFileName, 'rb') as fid:
 	modelPacket = cPickle.load(fid)
-	REGRESSION_MODEL = modelPacket['model'        ]
-	MODEL_FEATURES   = modelPacket['features'     ]
-	PREPROCESSOR_X   = modelPacket['preprocessorX']
-	PREPROCESSOR_Y   = modelPacket['preprocessorY']
+	
+	REGRESSION_MODEL       = modelPacket['model'           ]
+	PREPROCESSOR_X         = modelPacket['preprocessorX'   ]
+	PREPROCESSOR_Y         = modelPacket['preprocessorY'   ]
+	
+	MODEL_FEATURE_NAMES    = modelPacket['feature_names'   ]
+	MODEL_FEATURE_DEFAULTS = modelPacket['feature_defaults']
 #Load search tree
-with open( treeFileName, 'rb') as fid:
-	searchTreePacket = cPickle.load(fid)
-	SEARCH_TREE_MODEL    = searchTreePacket['tree'    ] 
-	SEARCH_TREE_FEATURES = searchTreePacket['features']
-	SEARCH_TREE_DATA     = searchTreePacket['data'    ]
+#with open( treeFileName, 'rb') as fid:
+#	searchTreePacket = cPickle.load(fid)
+	
+#	SEARCH_TREE_MODEL    = searchTreePacket['tree'    ] 
+#	SEARCH_TREE_FEATURES = searchTreePacket['features']
+#	SEARCH_TREE_DATA     = searchTreePacket['data'    ]
 
 #Read data
-inputDataFrame = None
-if args.query != "" and args.input == "":
-	query = eval( "dict({})".format( args.query ) ) 
-	inputDataFrame = pd.DataFrame( data=query, index=[0] )
-if args.input != "" and args.query == "":
-	inputDataFrame = loadCSVData( inputFileName  )
-if 'floor_flag' in MODEL_FEATURES : 
-	mask = ( inputDataFrame['floor_number'] == 1 ) | ( inputDataFrame['floor_number'] == inputDataFrame['number_of_floors'] )
-	inputDataFrame['floor_flag'] = 1; inputDataFrame[ mask ]['floor_flag'] = 0;
+userQuery  = eval( "dict({})".format( inputQuery ) )
+inputQuery = MODEL_FEATURE_DEFAULTS
+inputQuery.update( userQuery )
 
-inputDataFrame = limitDataUsingLimitsFromFilename( inputDataFrame, limitsFileName )
-inputDataFrameForModel      = inputDataFrame[ MODEL_FEATURES       ]
-inputDataFrameForSearchTree = inputDataFrame[ SEARCH_TREE_FEATURES ]
+inputDataFrame = pd.DataFrame( data=inputQuery, index=[0] )
+
+#if 'floor_flag' in MODEL_FEATURES : 
+#	mask = ( inputDataFrame['floor_number'] == 1 ) | ( inputDataFrame['floor_number'] == inputDataFrame['number_of_floors'] )
+#	inputDataFrame['floor_flag'] = 1; inputDataFrame[ mask ]['floor_flag'] = 0;
+
+inputDataFrame              = limitDataUsingLimitsFromFilename( inputDataFrame, limitsFileName )
+inputDataFrameForModel      = inputDataFrame[ MODEL_FEATURE_NAMES  ]
+#inputDataFrameForSearchTree = inputDataFrame[ SEARCH_TREE_FEATURES ]
 
 if inputDataFrame.size > 1:
+	
 	predictedData  = testNeuralNetworkModel( REGRESSION_MODEL, PREPROCESSOR_X, PREPROCESSOR_Y, inputDataFrameForModel )
 	
 	for index, row in predictedData.iterrows():
 		price = row.price
 		print("{:,}".format( int( price ) ) )
-	
-	dataFrame = SEARCH_TREE_DATA 
-	dataFrame = findClosestItemsUsingSearchTreeMethod( SEARCH_TREE_MODEL, SEARCH_TREE_FEATURES, inputDataFrame, inputTolerances, dataFrame )
-	dataFrame = findClosestItemsUsingPlainMethod     ( inputDataFrame, inputTolerances, dataFrame )
-	"""
-	if len( dataFrame ) > 0 :	
-			pricePerSquare  = np.median( resultDataFrame['price']/resultDataFrame['total_square'] )
-			resultPrice     = pricePerSquare*totalSquare 
-			
-			print("{:,}".format( int( resultPrice ) ) )
-			
-			resultDataFrame['index'] = resultDataFrame.index
-			print( resultDataFrame.to_json( orient='records') )
-		else:
-			print("{:,}".format( 0 ) )
-	"""
+	#Load search tree
+	#with open( treeFileName, 'rb') as fid:
+	#	searchTreePacket = cPickle.load(fid)
+	#	
+	#	SEARCH_TREE_MODEL    = searchTreePacket['tree'    ] 
+	#	SEARCH_TREE_FEATURES = searchTreePacket['features']
+	#	SEARCH_TREE_DATA     = searchTreePacket['data'    ]
+	#
+	#dataFrame = SEARCH_TREE_DATA 
+	#dataFrame = findClosestItemsUsingSearchTreeMethod( SEARCH_TREE_MODEL, SEARCH_TREE_FEATURES, inputDataFrame, inputTolerances, dataFrame )
+	#dataFrame = findClosestItemsUsingPlainMethod     ( inputDataFrame, inputTolerances, dataFrame )
