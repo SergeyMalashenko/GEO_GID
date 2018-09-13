@@ -14,6 +14,8 @@ import json
 import torch
 import torch.optim
 
+from sqlalchemy import create_engine
+
 FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square', 'distance_from_metro']
 INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors', 'exploitation_start_year' ]
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
@@ -100,10 +102,12 @@ class LinearNet(torch.nn.Module):
 		self.fc1 = torch.nn.Linear( in_size, 200); torch.nn.init.xavier_uniform_( self.fc1.weight );
 		self.fc2 = torch.nn.Linear(200, 200);      torch.nn.init.xavier_uniform_( self.fc2.weight );
 		self.fc3 = torch.nn.Linear(200,   1);      torch.nn.init.xavier_uniform_( self.fc3.weight );
-		
+
+		self.bn1 = torch.nn.BatchNorm1d(200)
+		self.bn2 = torch.nn.BatchNorm1d(200)
 	def forward(self, x0):
-		x1 = torch.nn.functional.relu( self.fc1(x0) )
-		x2 = torch.nn.functional.relu( self.fc2(x1) )
+		x1 = torch.nn.functional.relu( self.bn1( self.fc1(x0) ) )
+		x2 = torch.nn.functional.relu( self.bn2( self.fc2(x1) ) )
 		x3 = self.fc3(x2)
 		return x3
 	def gradient( self, x ):
@@ -122,7 +126,7 @@ def limitDataUsingProcentiles( dataFrame ):
 		pricePerSquare       = ( dataFrame['price']/dataFrame['total_square'] )
 		pricePerSquareValues = pricePerSquare.values
 		
-		robustScaler = RobustScaler(quantile_range=(15, 85) )
+		robustScaler = RobustScaler(quantile_range=(20, 80) )
 		robustScaler.fit( pricePerSquareValues.reshape((-1,1)) )
 		pricePerSquareValues = robustScaler.transform( pricePerSquareValues.reshape((-1,1)) ).reshape(-1)
 		
@@ -170,4 +174,52 @@ def loadCSVData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
 	#dataFrame[ mask ]['floor_flag'] = 1;
 	
 	return dataFrame
+
+class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
+	def __call__(self, fileName, COLUMN_TYPE='NUMERICAL' ):
+		dataFrame = pd.read_csv(
+			fileName, 
+			sep=";",
+			encoding='cp1251', 
+			#verbose=True, 
+			keep_default_na=False
+		).dropna(how="all")
+		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
+	def __call__(self, dataBase, tableName, COLUMN_TYPE='NUMERICAL' ):
+		engine = create_engine( dataBase )
+		dataFrame = pd.read_sql_table( tableName, engine)
+		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
+	def __processDataFrame(self, dataFrame, COLUMN_TYPE ):
+		if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
+		dataFrame = dataFrame[ dataFrame.apply( check_row, axis=1 ) ]
+		
+		for columnName in (FLOAT_COLUMNS + INT_COLUMNS):
+			if columnName in dataFrame.columns : dataFrame[ columnName ] = dataFrame[ columnName ].astype( np.float32 )
+		
+		#print('Shape of the data with all features:', dataFrame.shape)
+		if COLUMN_TYPE == 'NUMERICAL' :
+			dataFrame = dataFrame.select_dtypes(exclude=['object'])
+		#if COLUMN_TYPE == 'OBJECT'    :
+		#	dataFrame = dataFrame.select_dtypes(exclude=['number'])
+		#print('Shape of the data with numerical features:', dataFrame.shape)
+		#print("List of features contained our dataset:",list( dataFrame.columns ))
+		
+		subset = None
+		if 'price' in dataFrame.columns : 
+			subset=['price', 'total_square', 'number_of_rooms' ]	
+		else :
+			subset=['total_square', 'number_of_rooms' ]	
+		dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
+		#Process floor number
+		#dataFrame['floor_flag'] = 0;
+		#mask = ( dataFrame['floor_number'] == 1                             )
+		#dataFrame[ mask ]['floor_flag'] = -1;
+		#mask = ( dataFrame['floor_number'] == dataFrame['number_of_floors'] )
+		#dataFrame[ mask ]['floor_flag'] = 1;
+		
+		return dataFrame
+
+
+
+
 

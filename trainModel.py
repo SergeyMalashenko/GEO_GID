@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -39,7 +38,7 @@ import pydot
 import torch
 import torch.optim
 
-from commonModel import loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN, QuantileRegressionLoss, HuberRegressionLoss
+from commonModel import loadDataFrame, loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN, QuantileRegressionLoss, HuberRegressionLoss
 from commonModel import limitDataUsingLimitsFromFilename
 from commonModel import limitDataUsingProcentiles
 from commonModel import LinearNet
@@ -48,7 +47,11 @@ import matplotlib
 #matplotlib.use('Agg')
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--input"  , type=str             )
+parser.add_argument("--input"   , type=str, default="" )
+
+parser.add_argument("--database", type=str, default="" )
+parser.add_argument("--table"   , type=str, default="" )
+
 parser.add_argument("--model"  , type=str, default="" )
 parser.add_argument("--seed"   , type=int, default=43 )
 parser.add_argument("--output" , type=str, default="" )
@@ -265,18 +268,19 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	
 	learning_rate = 0.001
 	#loss_fn       = torch.nn.SmoothL1Loss()
-	#loss_fn       = QuantileRegressionLoss( 0.5 ) 
+	loss_fn       = QuantileRegressionLoss( 0.5 ) 
 	#loss_fn       = HuberRegressionLoss( 0.15 ) 
 	#loss_fn       = torch.nn.MSELoss  ( size_average=False)
-	loss_fn       = torch.nn.L1Loss  ( )
+	#loss_fn       = torch.nn.L1Loss  ( )
 	#optimizer     = torch.optim.SGD   ( model.parameters(), lr=learning_rate, momentum=0.9)
-	optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate )
-	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=500, gamma=0.1)
+	optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate, amsgrad=True )
+	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=500, gamma=0.5)
 	
-	batch_size    = 256
+	batch_size        = 256 
 	max_nbr_corrects_ = 0
-	for t in range(5000):
-		X_numpyTrain, X_numpyTest, Y_numpyTrain, Y_numpyTest = train_test_split( X_values, Y_values, test_size=0.2 )
+	model.train()
+	for t in range(7000):
+		X_numpyTrain, X_numpyTest, Y_numpyTrain, Y_numpyTest = train_test_split( X_values, Y_values, test_size=0.1 )
 		
 		X_torchTrain = torch.from_numpy( X_numpyTrain.astype( np.float32 ) ).to( device )
 		X_torchTest  = torch.from_numpy( X_numpyTest .astype( np.float32 ) ).to( device )
@@ -301,8 +305,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 		X_torchTest_s  = torch.split( X_torchTest , batch_size, dim=0 )
 		Y_torchTest_s  = torch.split( Y_torchTest , batch_size, dim=0 )
 		
-		for param_group in optimizer.param_groups:
-			learning_rate = param_group['lr']
+		length = ( len( X_torchTest_s ) - 1)*batch_size
 		#Train
 		for i in range( len(Y_torchTrain_s)-1 ):
 			x = X_torchTrain_s[i]
@@ -329,35 +332,37 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 		
 		Y_numpyPredict = Y_torchPredict.detach().numpy()
 		
-		length = (len(Y_torchPredict_s)-1)*batch_size
-		mean_squared_error_  = mean_squared_error    ( Y_numpyTest[:length], Y_numpyPredict[:length] )
-		mean_absolute_error_ = mean_absolute_error   ( Y_numpyTest[:length], Y_numpyPredict[:length] )
-		mean_median_error_   = median_absolute_error ( Y_numpyTest[:length], Y_numpyPredict[:length] )
+		mean_squared_error_  = mean_squared_error    ( Y_numpyTest, Y_numpyPredict )
+		mean_absolute_error_ = mean_absolute_error   ( Y_numpyTest, Y_numpyPredict )
+		mean_median_error_   = median_absolute_error ( Y_numpyTest, Y_numpyPredict )
 		
 		threshold = 0.1; eps = 0.001
-		cur_nbr_corrects_ = np.sum( np.abs( (Y_numpyPredict[:length] - Y_numpyTest[:length])/( Y_numpyTest[:length] + eps ) < threshold ) )
+		cur_nbr_corrects_ = np.sum( np.abs( (Y_numpyPredict - Y_numpyTest)/( Y_numpyTest + eps ) ) <= threshold )
 		max_nbr_corrects_ = max( cur_nbr_corrects_, max_nbr_corrects_ )
 		print( "epoch: {:6d}, loss: {:6.4f}, mean squared error: {:6.4f}, mean absolute error: {:6.4f}, mean median error: {:6.4f}, nbr_corrects=({}/{}/{})".format( t, loss_, mean_squared_error_, mean_absolute_error_, mean_median_error_, cur_nbr_corrects_, max_nbr_corrects_, length ) )
 		scheduler.step()
 	# Check model
+	model.eval()
+	
 	X_numpyTotal = X_values
 	Y_numpyTotal = Y_values
 	
 	X_torchTotal = torch.from_numpy( X_numpyTotal.astype( np.float32 ) ).to( device )
 	Y_torchTotal = torch.from_numpy( Y_numpyTotal.astype( np.float32 ) ).to( device )
-	
 	Y_torchPredict = model( X_torchTotal )
 	Y_numpyPredict = Y_torchPredict.detach().numpy()
 	Y_numpyTotal   = Y_torchTotal  .detach().numpy()
 	
+	eps = 0.001
+	Y_relErr = np.abs( Y_numpyPredict - Y_numpyTotal )/( Y_numpyTotal + eps )
+	for threshold in [ 0.025, 0.05, 0.10, 0.15 ]:
+		bad_s   = np.sum( ( Y_relErr  > threshold ) )
+		good_s  = np.sum( ( Y_relErr <= threshold ) )
+		total_s = Y_relErr.size
+		print("threshold = {:5}, good = {:10}, bad = {:10}, err = {:4}".format( threshold, good_s, bad_s, good_s/(good_s+bad_s)) )
+	
 	Y_numpyPredict = preprocessorY.inverse_transform( Y_numpyPredict )
 	Y_numpyTotal   = preprocessorY.inverse_transform( Y_numpyTotal   )
-	
-	Y_relErr = np.abs( Y_numpyPredict - Y_numpyTotal )*100/Y_numpyTotal
-	for threshold in [ 2.5, 5.0, 10.0, 15.0 ]:
-		bad_s  = np.sum( ( Y_relErr  > threshold ).astype( np.int ) )
-		good_s = np.sum( ( Y_relErr <= threshold ).astype( np.int ) )
-		print("threshold = {:5}, good = {:10}, bad = {:10}, err = {:4}".format( threshold, good_s, bad_s, good_s/(good_s+bad_s)) )
 	
 	modelPacket = dict()
 	modelPacket['model'           ] = model
@@ -425,7 +430,6 @@ def postProcessData( modelPacket, dataFrame, targetColumn, droppedColumns=[] ) :
 	mask = Y_relativeError <= threshold
 	goodValues = pricePerSquare[ mask ]
 	
-	
 	bins = range(30)
 	bins = [i * 0.5e4 for i in bins]
 	
@@ -440,13 +444,21 @@ def postProcessData( modelPacket, dataFrame, targetColumn, droppedColumns=[] ) :
 	
 	return
  
-inputFileName  = args.input
+inputFileName = args.input    #NizhniyNovgorod.csv
+inputDatabase = args.database #mysql://sr:A4y8J6r4@149.154.71.73:3310/sr_dev nn
+inputTable    = args.table    #nn
+
 modelFileName  = args.model
 outputFileName = args.output
 limitsFileName = args.limits
 seed           = args.seed
 
-trainDataFrame = loadCSVData                     ( inputFileName  )
+trainDataFrame = None
+#if inputFileName != "" :
+#	trainDataFrame = loadDataFrame()( inputFileName  )
+if inputDatabase != "" and inputTable != "" : 
+	trainDataFrame = loadDataFrame()( inputDatabase, inputTable )
+
 trainDataFrame = limitDataUsingLimitsFromFilename( trainDataFrame, limitsFileName )
 trainDataFrame = limitDataUsingProcentiles       ( trainDataFrame )
 
