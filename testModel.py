@@ -51,7 +51,7 @@ def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTole
 	sql_query  = """SELECT * FROM {} WHERE """.format( inputTable )
 	sql_query += """ AND """.join( "{1} <= {0} AND {0} <= {2}".format( field, min_value, max_value ) for ( field, (min_value, max_value) ) in processedLimits.items() )	
 		
-	return pd.read_sql_query( sql_query, engine) 
+	return pd.read_sql_query( sql_query, engine)[['re-id']] 
 
 def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, droppedColumns=[] ):
 	import warnings
@@ -129,4 +129,4 @@ if inputDataSize > 0: # Check that input data is correct
 		closestItems     = getClosestItemsInDatabase( inputRow, inputDatabase, inputTable, inputTolerances )
 		
 		print("{:,}".format( int( predictedValue.price ) ) )
-		print( closestItems.to_json( orient='records') )	
+		print( closestItems.to_json( orient='records') )

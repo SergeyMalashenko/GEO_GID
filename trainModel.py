@@ -5,6 +5,7 @@ from __future__ import print_function
 
 from sklearn.feature_selection import f_classif, f_regression, SelectKBest, chi2
 from sklearn.ensemble          import IsolationForest
+from sklearn.neighbors         import LocalOutlierFactor
 
 from sklearn.model_selection   import train_test_split
 from sklearn.model_selection   import GridSearchCV, RandomizedSearchCV
@@ -12,7 +13,7 @@ from sklearn.ensemble          import GradientBoostingRegressor, RandomForestReg
 from sklearn.metrics           import mean_squared_error, mean_absolute_error, median_absolute_error
 
 from sklearn.preprocessing import PolynomialFeatures
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model  import LinearRegression
 
 from sklearn.preprocessing     import QuantileTransformer
 from sklearn.preprocessing     import LabelEncoder
@@ -20,9 +21,9 @@ from sklearn.preprocessing     import MinMaxScaler, StandardScaler
 from sklearn.neighbors         import KNeighborsRegressor
 from sklearn.tree              import export_graphviz
 
-from sklearn.svm import SVR
+from sklearn.pipeline          import Pipeline
 
-from sklearn.pipeline            import Pipeline
+from scipy.spatial.distance    import mahalanobis
 
 import math
 
@@ -60,19 +61,44 @@ parser.add_argument("--limits" , type=str, default="" )
 args = parser.parse_args()
 
 def preProcessData( dataFrame, targetColumn, seed ):
-	def excludeAnomalies( dataFrame, targetColumn ):
+	def excludeAnomaliesIsolationForest( dataFrame, targetColumn ):
 		Y_data = dataFrame    [[ targetColumn ]];       Y_values = Y_data.values;
 		X_data = dataFrame.drop( targetColumn, axis=1); X_values = X_data.values;
-		clf = IsolationForest(max_samples = 200, random_state = 42); clf.fit( X_values )
+		clf = IsolationForest(); clf.fit( X_values )
 		
 		y_noano = clf.predict( X_values )
 		y_noano = pd.DataFrame(y_noano, columns = ['Top'])
 		y_noano[y_noano['Top'] == 1].index.values
 		
 		dataFrame = dataFrame.iloc[y_noano[y_noano['Top'] == 1].index.values]
-		
+		print("IsolationForest algorithm" )
 		print("Number of Outliers:", y_noano[y_noano['Top'] == -1].shape[0])
 		print("Number of rows without outliers:", dataFrame.shape[0])
+		return dataFrame
+	
+	def excludeAnomaliesLocalOutlierFactor( dataFrame ):
+		processedDataFrame = pd.DataFrame(index=dataFrame.index)
+		processedDataFrame['price_square'           ] = dataFrame['price']/dataFrame['total_square']
+		processedDataFrame['longitude'              ] = dataFrame['longitude']
+		processedDataFrame['latitude'               ] = dataFrame['latitude' ]
+		processedDataFrame['exploitation_start_year'] = dataFrame['exploitation_start_year']
+		
+		X_values = processedDataFrame.values;
+		preprocessor = MinMaxScaler()
+		preprocessor.fit( X_values )
+		X_values = preprocessor.transform( X_values )
+	
+		clf     = LocalOutlierFactor( n_neighbors=20 )
+		y_noano = clf.fit_predict( X_values )
+		y_noano = pd.DataFrame(y_noano, columns = ['Top'])
+		y_noano[y_noano['Top'] == 1].index.values
+		
+		print( dataFrame.shape[0] )
+		dataFrame = dataFrame.iloc[y_noano[y_noano['Top'] == 1].index.values]
+		print("LocalOutlierFactor algorithm")
+		print("Number of Outliers:", y_noano[y_noano['Top'] == -1].shape[0])
+		print("Number of rows without outliers:", dataFrame.shape[0])
+		
 		return dataFrame
 	
 	def selectFeatures( dataFrame, targetColumn ):
@@ -100,8 +126,9 @@ def preProcessData( dataFrame, targetColumn, seed ):
 		dataFrame[ targetColumn ] = Y_values_
 		return dataFrame
 	
-	dataFrame = excludeAnomalies         ( dataFrame, targetColumn )
-	dataFrame = selectFeatures           ( dataFrame, targetColumn )
+	#dataFrame = excludeAnomaliesIsolationForest   ( dataFrame, targetColumn )
+	dataFrame = excludeAnomaliesLocalOutlierFactor( dataFrame )
+	dataFrame = selectFeatures                    ( dataFrame, targetColumn )
 	
 	with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
 		print( dataFrame.describe() )
@@ -241,7 +268,6 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	COLUMNS       = list( dataFrame.columns );
 	LABEL         = targetColumn;
 	
-	INDEX       = dataFrame.index.values
 	Y_dataFrame = dataFrame    [[ targetColumn ]];       Y_values = Y_dataFrame.values;
 	X_dataFrame = dataFrame.drop( targetColumn, axis=1); X_values = X_dataFrame.values;
 	Y_values    = Y_values
@@ -268,10 +294,10 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	
 	learning_rate = 0.001
 	#loss_fn       = torch.nn.SmoothL1Loss()
-	loss_fn       = QuantileRegressionLoss( 0.5 ) 
+	#loss_fn       = QuantileRegressionLoss( 0.5 ) 
 	#loss_fn       = HuberRegressionLoss( 0.15 ) 
 	#loss_fn       = torch.nn.MSELoss  ( size_average=False)
-	#loss_fn       = torch.nn.L1Loss  ( )
+	loss_fn       = torch.nn.L1Loss  ( )
 	#optimizer     = torch.optim.SGD   ( model.parameters(), lr=learning_rate, momentum=0.9)
 	optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate, amsgrad=True )
 	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=500, gamma=0.5)
@@ -280,7 +306,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	max_nbr_corrects_ = 0
 	model.train()
 	for t in range(7000):
-		X_numpyTrain, X_numpyTest, Y_numpyTrain, Y_numpyTest = train_test_split( X_values, Y_values, test_size=0.1 )
+		X_numpyTrain, X_numpyTest, Y_numpyTrain, Y_numpyTest = train_test_split( X_values, Y_values, test_size=0.15 )
 		
 		X_torchTrain = torch.from_numpy( X_numpyTrain.astype( np.float32 ) ).to( device )
 		X_torchTest  = torch.from_numpy( X_numpyTest .astype( np.float32 ) ).to( device )
@@ -434,7 +460,18 @@ def postProcessData( modelPacket, dataFrame, targetColumn, droppedColumns=[] ) :
 	bins = [i * 0.5e4 for i in bins]
 	
 	plt.hist([ allValues, goodValues, badValues ], bins=bins, histtype='bar', color=['green','yellow','red'])	
-		
+	
+	allValues , bins_ = np.histogram(  allValues, bins=bins )
+	goodValues, bins_ = np.histogram( goodValues, bins=bins )
+	badValues , bins_ = np.histogram(  badValues, bins=bins )
+	
+	#plt.subplot(2, 1, 2)
+	#cell_text = [['{:2.1f}'.format( good_*100./(all_+0.01) ) for good_, bad_, all_ in zip( goodValues, badValues, allValues )],]
+	#table_plt = plt.table(cellText=cell_text, rowLoc='center', colLoc='center')
+	#table_plt.auto_set_font_size(False)
+	#table_plt.set_fontsize(12)
+	#table_plt.scale(1, 2)
+	
 	plt.subplot(2, 1, 2)
 	plt.plot   ( Y_numpyTotal  , Y_numpyTotal, c='blue' )
 	plt.plot   ( Y_numpyTotal  , Y_numpyTotal*(1.0 + 0.1), c='red'  )
@@ -466,7 +503,6 @@ trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
 
 #TrainedModelPacket, ( Y_predict, Y_test ) = trainRandomForestModel    ( trainDataFrame, TARGET_COLUMN, seed )
 #TrainedModelPacket, ( Y_predict, Y_test ) = trainGradientBoostingModel( trainDataFrame, TARGET_COLUMN, seed )
-
 trainedModelPacket, ( Y_predict, Y_test ) = trainNeuralNetworkModel   ( trainDataFrame, TARGET_COLUMN, seed )
 
 postProcessData( trainedModelPacket, trainDataFrame, TARGET_COLUMN )

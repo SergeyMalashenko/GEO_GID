@@ -21,10 +21,6 @@ INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors', 'exploi
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
 TARGET_COLUMN =   'price'
 
-def ballTreeDistance( X1, X2 ):
-	X1_latitude  = X1[1]; X1_longitude = X1[2]; X2_latitude  = X2[1]; X2_longitude = X2[2];
-	return np.sqrt( (X2_latitude - X1_latitude)**2 + (X2_longitude - X1_longitude)**2 )
-
 def check_float( x ):
 	try:
 		float(x)
@@ -126,7 +122,7 @@ def limitDataUsingProcentiles( dataFrame ):
 		pricePerSquare       = ( dataFrame['price']/dataFrame['total_square'] )
 		pricePerSquareValues = pricePerSquare.values
 		
-		robustScaler = RobustScaler(quantile_range=(20, 80) )
+		robustScaler = RobustScaler(quantile_range=(10, 90) )
 		robustScaler.fit( pricePerSquareValues.reshape((-1,1)) )
 		pricePerSquareValues = robustScaler.transform( pricePerSquareValues.reshape((-1,1)) ).reshape(-1)
 		
