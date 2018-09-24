@@ -18,6 +18,8 @@ from sqlalchemy import create_engine
 
 FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square', 'distance_from_metro']
 INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors', 'exploitation_start_year' ]
+DATE_COLUMNS  = [ 're_created_at' ]
+#INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors' ]
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
 TARGET_COLUMN =   'price'
 
@@ -68,10 +70,18 @@ class QuantileRegressionLoss( torch.nn.Module ):
 		return result
 
 def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
+	def date_hook( json_dict ):
+		for (key, value) in json_dict.items(): 
+			try: 
+				json_dict[key]['min'] = datetime.datetime.strptime(value['min'], "%Y-%m-%dT%H:%M:%S") 
+				json_dict[key]['max'] = datetime.datetime.strptime(value['max'], "%Y-%m-%dT%H:%M:%S") 
+			except: 
+				pass 
+		return json_dict 
+	
 	limitsData = dict()
 	with open( limitsFileName ) as f:
-		limitsData = json.load(f)
-	
+		limitsData = json.load(f, object_hook=date_hook )
 	mask = True
 	for columnName in limitsData.keys() :
 		MIN_VALUE = limitsData[ columnName ]['min']
@@ -82,8 +92,9 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 	
 	dataFrame = dataFrame[ mask ]
 	
-	#dataFrame.drop(labels=['kitchen_square','living_square','floor_number'], axis=1, inplace=True)
+	#dataFrame.drop(labels=['re-id','kitchen_square','living_square','floor_number'], axis=1, inplace=True)
 	dataFrame.drop(labels=['living_square','floor_number'], axis=1, inplace=True)
+	#dataFrame.drop(labels=['re-id'], axis=1, inplace=True)
 	#if 'id' in dataFrame.columns : dataFrame.drop(labels=['id',], axis=1, inplace=True )	
 	
 	return dataFrame
@@ -131,45 +142,6 @@ def limitDataUsingProcentiles( dataFrame ):
 		dataFrame = dataFrame[ mask ]	
 	
 	return dataFrame
-	
-def loadCSVData( fileName, COLUMN_TYPE='NUMERICAL' ): # NUMERICAL, OBJECT, ALL
-
-	dataFrame = pd.read_csv(
-		fileName, 
-		sep=";",
-		encoding='cp1251', 
-		#verbose=True, 
-		keep_default_na=False
-	).dropna(how="all")
-	
-	if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
-	dataFrame = dataFrame[ dataFrame.apply( check_row  , axis=1 ) ]
-	
-	for columnName in (FLOAT_COLUMNS + INT_COLUMNS):
-		if columnName in dataFrame.columns : dataFrame[ columnName ] = dataFrame[ columnName ].astype( np.float32 )
-	
-	#print('Shape of the data with all features:', dataFrame.shape)
-	if COLUMN_TYPE == 'NUMERICAL' :
-		dataFrame = dataFrame.select_dtypes(exclude=['object'])
-	#if COLUMN_TYPE == 'OBJECT'    :
-	#	dataFrame = dataFrame.select_dtypes(exclude=['number'])
-	#print('Shape of the data with numerical features:', dataFrame.shape)
-	#print("List of features contained our dataset:",list( dataFrame.columns ))
-	
-	subset = None
-	if 'price' in dataFrame.columns : 
-		subset=['price', 'total_square', 'number_of_rooms' ]	
-	else :
-		subset=['total_square', 'number_of_rooms' ]	
-	dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
-	#Process floor number
-	#dataFrame['floor_flag'] = 0;
-	#mask = ( dataFrame['floor_number'] == 1                             )
-	#dataFrame[ mask ]['floor_flag'] = -1;
-	#mask = ( dataFrame['floor_number'] == dataFrame['number_of_floors'] )
-	#dataFrame[ mask ]['floor_flag'] = 1;
-	
-	return dataFrame
 
 class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
 	def __call__(self, fileName, COLUMN_TYPE='NUMERICAL' ):
@@ -177,7 +149,6 @@ class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
 			fileName, 
 			sep=";",
 			encoding='cp1251', 
-			#verbose=True, 
 			keep_default_na=False
 		).dropna(how="all")
 		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
@@ -187,18 +158,18 @@ class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
 		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
 	def __processDataFrame(self, dataFrame, COLUMN_TYPE ):
 		if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
-		dataFrame = dataFrame[ dataFrame.apply( check_row, axis=1 ) ]
+		
+		dataFrame = dataFrame[ dataFrame.apply( check_row , axis=1 ) ]
+		#dataFrame = dataFrame[ dataFrame.apply( check_date, axis=1 ) ]
 		
 		for columnName in (FLOAT_COLUMNS + INT_COLUMNS):
 			if columnName in dataFrame.columns : dataFrame[ columnName ] = dataFrame[ columnName ].astype( np.float32 )
 		
 		#print('Shape of the data with all features:', dataFrame.shape)
 		if COLUMN_TYPE == 'NUMERICAL' :
-			dataFrame = dataFrame.select_dtypes(exclude=['object'])
-		#if COLUMN_TYPE == 'OBJECT'    :
-		#	dataFrame = dataFrame.select_dtypes(exclude=['number'])
-		#print('Shape of the data with numerical features:', dataFrame.shape)
-		#print("List of features contained our dataset:",list( dataFrame.columns ))
+			dataFrame = dataFrame.select_dtypes(include=['number'])
+		if COLUMN_TYPE == 'OBJECT'    :
+			dataFrame = dataFrame.select_dtypes(include=['object'])
 		
 		subset = None
 		if 'price' in dataFrame.columns : 
@@ -206,12 +177,6 @@ class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
 		else :
 			subset=['total_square', 'number_of_rooms' ]	
 		dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
-		#Process floor number
-		#dataFrame['floor_flag'] = 0;
-		#mask = ( dataFrame['floor_number'] == 1                             )
-		#dataFrame[ mask ]['floor_flag'] = -1;
-		#mask = ( dataFrame['floor_number'] == dataFrame['number_of_floors'] )
-		#dataFrame[ mask ]['floor_flag'] = 1;
 		
 		return dataFrame
 

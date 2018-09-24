@@ -39,7 +39,7 @@ import pydot
 import torch
 import torch.optim
 
-from commonModel import loadDataFrame, loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN, QuantileRegressionLoss, HuberRegressionLoss
+from commonModel import loadDataFrame, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN, QuantileRegressionLoss, HuberRegressionLoss
 from commonModel import limitDataUsingLimitsFromFilename
 from commonModel import limitDataUsingProcentiles
 from commonModel import LinearNet
@@ -61,6 +61,7 @@ parser.add_argument("--limits" , type=str, default="" )
 args = parser.parse_args()
 
 def preProcessData( dataFrame, targetColumn, seed ):
+	"""
 	def excludeAnomaliesIsolationForest( dataFrame, targetColumn ):
 		Y_data = dataFrame    [[ targetColumn ]];       Y_values = Y_data.values;
 		X_data = dataFrame.drop( targetColumn, axis=1); X_values = X_data.values;
@@ -74,6 +75,31 @@ def preProcessData( dataFrame, targetColumn, seed ):
 		print("IsolationForest algorithm" )
 		print("Number of Outliers:", y_noano[y_noano['Top'] == -1].shape[0])
 		print("Number of rows without outliers:", dataFrame.shape[0])
+		return dataFrame
+	"""
+	def excludeAnomaliesIsolationForest( dataFrame ):
+		processedDataFrame = pd.DataFrame(index=dataFrame.index)
+		processedDataFrame['price_square'           ] = dataFrame['price']/dataFrame['total_square']
+		processedDataFrame['longitude'              ] = dataFrame['longitude']
+		processedDataFrame['latitude'               ] = dataFrame['latitude' ]
+		processedDataFrame['exploitation_start_year'] = dataFrame['exploitation_start_year']
+		
+		X_values = processedDataFrame.values;
+		preprocessor = MinMaxScaler()
+		preprocessor.fit( X_values )
+		X_values = preprocessor.transform( X_values )
+	
+		clf     = IsolationForest(); clf.fit( X_values );
+		y_noano = clf.predict( X_values )
+		y_noano = pd.DataFrame(y_noano, columns = ['Top'])
+		y_noano[y_noano['Top'] == 1].index.values
+		
+		print( dataFrame.shape[0] )
+		dataFrame = dataFrame.iloc[y_noano[y_noano['Top'] == 1].index.values]
+		print("IsolationForest algorithm")
+		print("Number of Outliers:", y_noano[y_noano['Top'] == -1].shape[0])
+		print("Number of rows without outliers:", dataFrame.shape[0])
+		
 		return dataFrame
 	
 	def excludeAnomaliesLocalOutlierFactor( dataFrame ):
@@ -126,9 +152,9 @@ def preProcessData( dataFrame, targetColumn, seed ):
 		dataFrame[ targetColumn ] = Y_values_
 		return dataFrame
 	
-	#dataFrame = excludeAnomaliesIsolationForest   ( dataFrame, targetColumn )
+	dataFrame = excludeAnomaliesIsolationForest   ( dataFrame )
 	dataFrame = excludeAnomaliesLocalOutlierFactor( dataFrame )
-	dataFrame = selectFeatures                    ( dataFrame, targetColumn )
+	#dataFrame = selectFeatures                    ( dataFrame, targetColumn )
 	
 	with pd.option_context('display.max_rows', None, 'display.max_columns', 10, 'display.width', 175 ):
 		print( dataFrame.describe() )
@@ -305,7 +331,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	batch_size        = 256 
 	max_nbr_corrects_ = 0
 	model.train()
-	for t in range(7000):
+	for t in range(1000):
 		X_numpyTrain, X_numpyTest, Y_numpyTrain, Y_numpyTest = train_test_split( X_values, Y_values, test_size=0.15 )
 		
 		X_torchTrain = torch.from_numpy( X_numpyTrain.astype( np.float32 ) ).to( device )
@@ -443,8 +469,6 @@ def postProcessData( modelPacket, dataFrame, targetColumn, droppedColumns=[] ) :
 	Y_numpyPredict = preprocessorY.inverse_transform( Y_numpyPredict )
 	Y_numpyTotal   = preprocessorY.inverse_transform( Y_numpyTotal   )
 	
-	plt.subplot(2, 1, 1)
-	
 	threshold = 10
 	
 	Y_relativeError = np.abs( Y_numpyPredict - Y_numpyTotal )*100/Y_numpyTotal
@@ -456,28 +480,39 @@ def postProcessData( modelPacket, dataFrame, targetColumn, droppedColumns=[] ) :
 	mask = Y_relativeError <= threshold
 	goodValues = pricePerSquare[ mask ]
 	
-	bins = range(30)
+	bins = range(5,25)
 	bins = [i * 0.5e4 for i in bins]
 	
-	plt.hist([ allValues, goodValues, badValues ], bins=bins, histtype='bar', color=['green','yellow','red'])	
+	figure, axes =plt.subplots(3,1)
+	axes[1].axis('tight')
+	axes[1].axis('off')
 	
-	allValues , bins_ = np.histogram(  allValues, bins=bins )
-	goodValues, bins_ = np.histogram( goodValues, bins=bins )
-	badValues , bins_ = np.histogram(  badValues, bins=bins )
+	resultValues = axes[0].hist([ allValues, goodValues, badValues ], bins=bins, histtype='bar', color=['green','yellow','red'])
+	allValues  = resultValues[0][0]; goodValues = resultValues[0][1]; badValues = resultValues[0][2];
 	
-	#plt.subplot(2, 1, 2)
-	#cell_text = [['{:2.1f}'.format( good_*100./(all_+0.01) ) for good_, bad_, all_ in zip( goodValues, badValues, allValues )],]
-	#table_plt = plt.table(cellText=cell_text, rowLoc='center', colLoc='center')
-	#table_plt.auto_set_font_size(False)
-	#table_plt.set_fontsize(12)
-	#table_plt.scale(1, 2)
+	accuracy = goodValues*100/(allValues+0.01)
+	col_label = ['{:5d}'.format( int((bins[i+0]+bins[i+1])/2) ) for i in range( len(bins)-1 ) ]
+	cell_text = [['{:2.1f}'.format( acc_ ) for acc_ in accuracy],]
 	
-	plt.subplot(2, 1, 2)
-	plt.plot   ( Y_numpyTotal  , Y_numpyTotal, c='blue' )
-	plt.plot   ( Y_numpyTotal  , Y_numpyTotal*(1.0 + 0.1), c='red'  )
-	plt.plot   ( Y_numpyTotal  , Y_numpyTotal*(1.0 - 0.1), c='red'  )
-	plt.scatter( Y_numpyPredict, Y_numpyTotal )
+	table_ = axes[1].table(cellText=cell_text, colLabels=col_label,loc='center')
+	table_.auto_set_font_size(False)
+	table_.set_fontsize(8)
+	
+	axes[2].plot   ( Y_numpyTotal  , Y_numpyTotal, c='blue' )
+	axes[2].plot   ( Y_numpyTotal  , Y_numpyTotal*(1.0 + 0.1), c='red'  )
+	axes[2].plot   ( Y_numpyTotal  , Y_numpyTotal*(1.0 - 0.1), c='red'  )
+	axes[2].scatter( Y_numpyPredict, Y_numpyTotal )
 	plt.show()
+	
+	#figure, axes =plt.subplots(3,1)
+	#clust_data = np.random.random((10,3))
+	#collabel=("col 1", "col 2", "col 3")
+	#axs[0].axis('tight')
+	#axs[0].axis('off')
+	#the_table = axs[0].table(cellText=clust_data,colLabels=collabel,loc='center')
+	
+	#axs[1].plot(clust_data[:,0],clust_data[:,1])
+	#plt.show()
 	
 	return
  
@@ -500,24 +535,9 @@ trainDataFrame = limitDataUsingLimitsFromFilename( trainDataFrame, limitsFileNam
 trainDataFrame = limitDataUsingProcentiles       ( trainDataFrame )
 
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
-
-#TrainedModelPacket, ( Y_predict, Y_test ) = trainRandomForestModel    ( trainDataFrame, TARGET_COLUMN, seed )
-#TrainedModelPacket, ( Y_predict, Y_test ) = trainGradientBoostingModel( trainDataFrame, TARGET_COLUMN, seed )
 trainedModelPacket, ( Y_predict, Y_test ) = trainNeuralNetworkModel   ( trainDataFrame, TARGET_COLUMN, seed )
-
 postProcessData( trainedModelPacket, trainDataFrame, TARGET_COLUMN )
 
 if modelFileName != "" :
 	with open( modelFileName, 'wb') as fid:
 		cPickle.dump( trainedModelPacket, fid)
-
-#if outputFileName != "":
-#	wrongPredictedDataFrame.to_csv(
-#		outputFileName,
-#		sep=";",
-#		encoding='cp1251',
-#		index=False 
-#	)
-#else:
-#	with pd.option_context('display.max_rows', None, 'display.max_columns', 11, 'display.width', 175 ):
-#		print( wrongPredictedDataFrame )

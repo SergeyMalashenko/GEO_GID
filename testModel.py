@@ -22,7 +22,7 @@ import math
 
 from sqlalchemy  import create_engine
 
-from commonModel import loadCSVData, FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
+from commonModel import FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, TARGET_COLUMN
 from commonModel import limitDataUsingLimitsFromFilename
 from commonModel import limitDataUsingProcentiles
 
