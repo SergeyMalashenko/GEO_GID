@@ -51,7 +51,7 @@ def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTole
 	sql_query  = """SELECT * FROM {} WHERE """.format( inputTable )
 	sql_query += """ AND """.join( "{1} <= {0} AND {0} <= {2}".format( field, min_value, max_value ) for ( field, (min_value, max_value) ) in processedLimits.items() )	
 		
-	return pd.read_sql_query( sql_query, engine)[['re-id']] 
+	return pd.read_sql_query( sql_query, engine)[['re_id']] 
 
 def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, droppedColumns=[] ):
 	import warnings
@@ -105,7 +105,6 @@ with open( modelFileName, 'rb') as fid:
 	MODEL_FEATURE_NAMES    = modelPacket['feature_names'   ]
 	MODEL_FEATURE_DEFAULTS = modelPacket['feature_defaults']
 	
-	print( MODEL_FEATURE_NAMES )
 #Process query
 userQuery    = eval( "dict({})".format( inputQuery ) )
 defaultQuery = MODEL_FEATURE_DEFAULTS
