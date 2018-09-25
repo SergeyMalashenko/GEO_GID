@@ -331,7 +331,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	batch_size        = 256 
 	max_nbr_corrects_ = 0
 	model.train()
-	for t in range(1000):
+	for t in range(8000):
 		X_numpyTrain, X_numpyTest, Y_numpyTrain, Y_numpyTest = train_test_split( X_values, Y_values, test_size=0.15 )
 		
 		X_torchTrain = torch.from_numpy( X_numpyTrain.astype( np.float32 ) ).to( device )

@@ -94,7 +94,7 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 	
 	#dataFrame.drop(labels=['re-id','kitchen_square','living_square','floor_number'], axis=1, inplace=True)
 	dataFrame.drop(labels=['living_square','floor_number'], axis=1, inplace=True)
-	#dataFrame.drop(labels=['re-id'], axis=1, inplace=True)
+	#dataFrame.drop(labels=['re_id'], axis=1, inplace=True)
 	#if 'id' in dataFrame.columns : dataFrame.drop(labels=['id',], axis=1, inplace=True )	
 	
 	return dataFrame
