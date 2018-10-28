@@ -532,6 +532,7 @@ if inputDatabase != "" and inputTable != "" :
 	trainDataFrame = loadDataFrame()( inputDatabase, inputTable )
 
 trainDataFrame = limitDataUsingLimitsFromFilename( trainDataFrame, limitsFileName )
+trainDataFrame = trainDataFrame.select_dtypes(include=['number'])
 trainDataFrame = limitDataUsingProcentiles       ( trainDataFrame )
 
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )

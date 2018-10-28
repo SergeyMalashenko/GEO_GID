@@ -167,6 +167,7 @@ class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
 		
 		#print('Shape of the data with all features:', dataFrame.shape)
 		if COLUMN_TYPE == 'NUMERICAL' :
+			#dataFrame = dataFrame.select_dtypes(include=['number','datetime'])
 			dataFrame = dataFrame.select_dtypes(include=['number'])
 		if COLUMN_TYPE == 'OBJECT'    :
 			dataFrame = dataFrame.select_dtypes(include=['object'])
