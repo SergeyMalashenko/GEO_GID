@@ -10,6 +10,9 @@ from sklearn.preprocessing      import RobustScaler
 from sklearn.preprocessing      import Normalizer
 from sklearn.preprocessing.data import QuantileTransformer
 
+from hessian import hessian
+from hessian import jacobian
+
 import json
 import torch
 import torch.optim
@@ -117,14 +120,22 @@ class LinearNet(torch.nn.Module):
 		x2 = torch.nn.functional.relu( self.bn2( self.fc2(x1) ) )
 		x3 = self.fc3(x2)
 		return x3
-	def gradient( self, x ):
+	def jacobian( self, x ):
 		x0 = torch.tensor( x, requires_grad=True)
 		x1 = torch.nn.functional.relu( self.fc1(x0) )
 		x2 = torch.nn.functional.relu( self.fc2(x1) )
-		x3 = self.fc3(x2)
-		x3.backward()
-		
-		return x0.grad
+		x3 = self.fc3(x2).squeeze()
+		#x3.backward()
+		#return x0.grad
+		return jacobian( x3, [x0,])
+	def hessian( self, x ):
+		x0 = torch.tensor( x, requires_grad=True)
+		x1 = torch.nn.functional.relu( self.fc1(x0) )
+		x2 = torch.nn.functional.relu( self.fc2(x1) )
+		x3 = self.fc3(x2).squeeze()
+		#x3.backward()
+		#return x0.grad
+		return hessian( x3, [x0,], create_graph=True)
 	 
 def limitDataUsingProcentiles( dataFrame ):
 	if 'price' in dataFrame.columns :
