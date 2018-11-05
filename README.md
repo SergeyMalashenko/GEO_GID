@@ -2,7 +2,7 @@
 
 Train model
 ```
-./trainModel.py --input input/NizhnyNovgorodWithYear.csv --model NizhnyNovgorodModelPacket.pkl --limits input/NizhnyNovgorodLimits.json
+./trainModel.py --model modelNizhnyNovgorod.pkl --limits input/NizhnyNovgorodLimits.json --database 'mysql://database' --table 'tablename'
 ```
 Check model
 ```
@@ -13,12 +13,7 @@ Now open your browser on the local machine and type in the address bar
 ```
 localhost:8888
 ```
-
-Build dataset with 
-
 Test  model
 ```
-./buildSearchTree.py --input ./input/NizhnyNovgorod.csv --limits ./input/NizhnyNovgorodLimits.json --output ./input/searchTreeNizhnyNovgorod.pkl
-./testModel.py --model NizhnyNovgorodModelPacket.pkl ---limits input/NizhnyNovgorodLimits.json --query 'longitude=44.075417, latitude=56.283864, total_square=43.0, living_square=14.0, kitchen_square=11.0, number_of_rooms=1, floor_number=9, number_of_floors=17' [--dataset input/NizhnyNovgorod.csv --tolerances 'longitude=0.001, latitude=0.001, total_square=5']
-
+./testModel.py --model modelNizhnyNovgorod.pkl --query 'longitude=44.0730544, latitude=56.286023, total_square=35, living_square=18, kitchen_square=9, number_of_rooms=1, floor_number=2, number_of_floors=10, exploitation_start_year=1991' --limits input/NizhnyNovgorodLimits.json --database 'mysql://database' --table 'tablename' --tolerances 'longitude=0.001, latitude=0.001'
 ```
