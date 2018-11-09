@@ -23,3 +23,6 @@ Max value       2,916,666
 Min value       1,720,155
 [{"re_id":1249},...,{"re_id":109169}]
 ```
+
+##Requirements
+Ubuntu 14.04/16.04, Python3 (scipy,numpy,scikit-learn,pytorch)
