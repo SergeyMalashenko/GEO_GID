@@ -10,8 +10,8 @@ from sklearn.preprocessing      import RobustScaler
 from sklearn.preprocessing      import Normalizer
 from sklearn.preprocessing.data import QuantileTransformer
 
-from hessian import hessian
-from hessian import jacobian
+#from hessian import hessian
+#from hessian import jacobian
 
 import json
 import torch
@@ -25,6 +25,21 @@ DATE_COLUMNS  = [ 're_created_at' ]
 #INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors' ]
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
 TARGET_COLUMN =   'price'
+
+CHARACTER_LENGTH = {
+	"total_square"  : 1., 
+	"living_square" : 1.,
+	"kitchen_square": 1.,
+	
+	"longitude"     : 0.01,
+	"latitude"      : 0.01,
+	
+	"number_of_floors" : 1.,
+	"number_of_rooms"  : 1.,
+	"floor_number"     : 1.,
+	
+	"exploitation_start_year" : 1.,
+}
 
 def check_float( x ):
 	try:
@@ -97,7 +112,7 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 	
 	#dataFrame.drop(labels=['re-id','kitchen_square','living_square','floor_number'], axis=1, inplace=True)
 	dataFrame.drop(labels=['living_square','floor_number'], axis=1, inplace=True)
-	#dataFrame.drop(labels=['re_id'], axis=1, inplace=True)
+	if 're_id' in dataFrame.columns : dataFrame.drop(labels=['re_id'], axis=1, inplace=True)
 	#if 'id' in dataFrame.columns : dataFrame.drop(labels=['id',], axis=1, inplace=True )	
 	
 	return dataFrame
@@ -125,18 +140,9 @@ class LinearNet(torch.nn.Module):
 		x1 = torch.nn.functional.relu( self.fc1(x0) )
 		x2 = torch.nn.functional.relu( self.fc2(x1) )
 		x3 = self.fc3(x2).squeeze()
-		#x3.backward()
-		#return x0.grad
-		return jacobian( x3, [x0,])
-	def hessian( self, x ):
-		x0 = torch.tensor( x, requires_grad=True)
-		x1 = torch.nn.functional.relu( self.fc1(x0) )
-		x2 = torch.nn.functional.relu( self.fc2(x1) )
-		x3 = self.fc3(x2).squeeze()
-		#x3.backward()
-		#return x0.grad
-		return hessian( x3, [x0,], create_graph=True)
-	 
+		x3.backward()
+		return x0.grad
+
 def limitDataUsingProcentiles( dataFrame ):
 	if 'price' in dataFrame.columns :
 		mask = True

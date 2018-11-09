@@ -19,6 +19,7 @@ import types
 import torch
 import timeit
 import math
+import sys
 
 from sqlalchemy  import create_engine
 
@@ -27,6 +28,10 @@ from commonModel import limitDataUsingLimitsFromFilename
 from commonModel import limitDataUsingProcentiles
 
 from commonModel import LinearNet
+
+pd.set_option('display.width'      , 500 )
+pd.set_option('display.max_rows'   , 500 )
+pd.set_option('display.max_columns', 500 )
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model"     , type=str                )
@@ -38,6 +43,7 @@ parser.add_argument("--database"  , type=str  , default=""  )
 parser.add_argument("--table"     , type=str  , default=""  )
 
 parser.add_argument("--alpha"     , type=float, default=1.0 )
+parser.add_argument("--verbose"   , action="store_true"     )
 
 def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTolerances ) :
 	engine = create_engine( inputDataBase )
@@ -53,15 +59,30 @@ def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTole
 	sql_query  = """SELECT * FROM {} WHERE """.format( inputTable )
 	sql_query += """ AND """.join( "{1} <= {0} AND {0} <= {2}".format( field, min_value, max_value ) for ( field, (min_value, max_value) ) in processedLimits.items() )	
 	
-	#print(sql_query)
 	resultValues = pd.read_sql_query( sql_query, engine)
 	subset=['price', 'total_square', 'number_of_rooms' ]	
 	resultValues.drop_duplicates(subset=subset, keep='first', inplace=True)	
 	
 	return resultValues
 
+def processClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE_NAMES, topk=5 ) :
+	processedInputItem     = inputItem    [ MODEL_FEATURE_NAMES ]
+	processedClosestItem_s = closestItem_s[ MODEL_FEATURE_NAMES ]
+	
+	processedInputItem_numpy     = processedInputItem   .values
+	processedClosestItem_s_numpy = processedClosestItem_s.values
+	
+	processedInputItem_numpy     = processedInputItem_numpy   .reshape(1,-1) 
+	#processedClosestItem_s_numpy = processedClosestItem_s_numpy.reshape(1,-1) 
+	processedInputItem_numpy     = PREPROCESSOR_X.transform( processedInputItem_numpy     )
+	processedClosestItem_s_numpy = PREPROCESSOR_X.transform( processedClosestItem_s_numpy )
+	processedResult_s_numpy      = processedClosestItem_s_numpy - processedInputItem_numpy
+	processedResult_s_numpy      = np.linalg.norm( processedResult_s_numpy, axis=1 )
+	
+	index_s = processedResult_s_numpy.argsort()[:topk] 
+	return closestItem_s.iloc[index_s]
 
-def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, droppedColumns=[] ):
+def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, droppedColumns=[], threshold=0.05 ):
 	import warnings
 	warnings.filterwarnings('ignore')
 	
@@ -83,7 +104,8 @@ def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, drop
 	
 	Y_base_numpy    = Y_torch  .detach().numpy()
 	dYdX_base_numpy = dY_torch .detach().numpy() # \frac{df}{dx}
-	dX_base_numpy   = Y_base_numpy*0.01/dYdX_base_numpy
+	
+	dX_base_numpy   = (Y_base_numpy*threshold)/dYdX_base_numpy
 	
 	Y_numpy         = preprocessorY.inverse_transform( Y_base_numpy )
 	dYdX_numpy      = dYdX_base_numpy
@@ -116,6 +138,7 @@ inputTable      = args.table
 inputTolerances = None if args.tolerances == "" else eval( "dict({})".format( args.tolerances ) ) 
 
 alphaParam      = args.alpha;
+verboseFlag     = args.verbose
 
 #Load tne model
 with open( modelFileName, 'rb') as fid:
@@ -149,15 +172,14 @@ if inputDataSize > 0: # Check that input data is correct
 		
 		predicted_Y, predicted_dYdX, predicted_dX = testNeuralNetworkModel   ( REGRESSION_MODEL, PREPROCESSOR_X, PREPROCESSOR_Y, inputRowForModel )
 		predicted_dYdX.columns = MODEL_FEATURE_NAMES; predicted_dX  .columns = MODEL_FEATURE_NAMES
-		print( "Predicted value {:,}".format( int( predicted_Y.values[0] ) ) )
 		
-		#inputTolerances = { name : abs(values[0]) for name, values in predicted_dX.iteritems() }
-		inputTolerances['longitude'               ] = predicted_dX['longitude'               ][0]
-		inputTolerances['latitude'                ] = predicted_dX['latitude'                ][0]
-		inputTolerances['number_of_floors'        ] = predicted_dX['number_of_floors'        ][0]
-		inputTolerances['exploitation_start_year' ] = predicted_dX['exploitation_start_year' ][0]
+		predicted_dX.sort_values( by=0, axis=1, ascending=False, inplace=True )
+		
+		inputTolerances = { name : abs(values[0]) for name, values in predicted_dX.iteritems() }
 		#Get the closest items
+		print( inputTolerances )
 		closestItems = getClosestItemsInDatabase( inputRow, inputDatabase, inputTable, inputTolerances )
+		closestItems = processClosestItems( inputRow, closestItems, PREPROCESSOR_X, MODEL_FEATURE_NAMES )
 		#Process the closest items
 		pricePerSquareMedian, pricePerSquareMean, pricePerSquareMax, pricePerSquareMin = 0, 0, 0, 0
 		if not closestItems.empty :
@@ -169,30 +191,17 @@ if inputDataSize > 0: # Check that input data is correct
 			pricePerSquareMean   = np.mean  ( pricePerSquareValues )
 			pricePerSquareMax    = np.max   ( pricePerSquareValues )
 			pricePerSquareMin    = np.min   ( pricePerSquareValues )
-			
+		
+		print( "Predicted value {:,}".format( int( predicted_Y.values[0] ) ) )
 		print( "Median value    {:,}".format( int( pricePerSquareMedian*inputRow[['total_square']].values[0] ) ) )
 		print( "Mean value      {:,}".format( int( pricePerSquareMean  *inputRow[['total_square']].values[0] ) ) )
 		print( "Max value       {:,}".format( int( pricePerSquareMax   *inputRow[['total_square']].values[0] ) ) )
 		print( "Min value       {:,}".format( int( pricePerSquareMin   *inputRow[['total_square']].values[0] ) ) )
-			
-		print( closestItems[['re_id']].to_json( orient='records') )
-		#
-		#predictedPricePerSquare_s = []
-		#closestPricePerSquare_s   = []
-		#for index,closestItem in closestItems.iterrows():
-		#	inputRowForModel = closestItem[ MODEL_FEATURE_NAMES ]
-		#	closestSquare    = float( closestItem.total_square )
-		#	predictedValue   = testNeuralNetworkModel( REGRESSION_MODEL, PREPROCESSOR_X, PREPROCESSOR_Y, inputRowForModel )
-		#	
-		#	predictedPrice = float( predictedValue.price )
-		#	closestPrice   = float( closestItem   .price )
-		#	
-		#	predictedPricePerSquare_s.append( float(predictedPrice/closestSquare) )
-		#	closestPricePerSquare_s  .append( float(closestPrice  /closestSquare) )
-		#	
-		#	print( predictedValue['price'], closestItem['price'] )
-		#print( np.median( np.array( predictedPricePerSquare_s ) ) )
-		#print( np.median( np.array( closestPricePerSquare_s   ) ) )
+		
+		if verboseFlag :
+			print( closestItems[['price','total_square']].to_json( orient='records') )
+		else :
+			print( closestItems[['re_id']].to_json( orient='records') )
 
 #predicted_dYdX = predicted_dYdX.assign(features=pd.Series(MODEL_FEATURE_NAMES).values)
 #predicted_dYdX = predicted_dYdX.assign(absolute=np.abs(predicted_dYdX['dYdX'].values))
