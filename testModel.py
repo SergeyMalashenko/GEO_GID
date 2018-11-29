@@ -43,6 +43,7 @@ parser.add_argument("--database"  , type=str  , default=""  )
 parser.add_argument("--table"     , type=str  , default=""  )
 
 parser.add_argument("--alpha"     , type=float, default=1.0 )
+parser.add_argument("--topk"      , type=int  , default=3   )
 parser.add_argument("--verbose"   , action="store_true"     )
 
 def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTolerances ) :
@@ -137,7 +138,8 @@ inputDatabase   = args.database
 inputTable      = args.table
 inputTolerances = None if args.tolerances == "" else eval( "dict({})".format( args.tolerances ) ) 
 
-alphaParam      = args.alpha;
+alphaParam      = args.alpha
+topkParam       = args.topk
 verboseFlag     = args.verbose
 
 #Load tne model
@@ -177,12 +179,13 @@ if inputDataSize > 0: # Check that input data is correct
 		
 		inputTolerances = { name : abs(values[0]) for name, values in predicted_dX.iteritems() }
 		#Get the closest items
-		print( inputTolerances )
+		#print( inputTolerances )
 		closestItems = getClosestItemsInDatabase( inputRow, inputDatabase, inputTable, inputTolerances )
-		closestItems = processClosestItems( inputRow, closestItems, PREPROCESSOR_X, MODEL_FEATURE_NAMES )
 		#Process the closest items
 		pricePerSquareMedian, pricePerSquareMean, pricePerSquareMax, pricePerSquareMin = 0, 0, 0, 0
 		if not closestItems.empty :
+			closestItems = processClosestItems( inputRow, closestItems, PREPROCESSOR_X, MODEL_FEATURE_NAMES )
+			
 			resultTotalSquareValues = list( map( float, closestItems[['total_square']].values ) )
 			resultTotalPriceValues  = list( map( float, closestItems[['price'       ]].values ) )
 			
@@ -202,7 +205,7 @@ if inputDataSize > 0: # Check that input data is correct
 			print( closestItems[['price','total_square']].to_json( orient='records') )
 		else :
 			print( closestItems[['re_id']].to_json( orient='records') )
-
+		
 #predicted_dYdX = predicted_dYdX.assign(features=pd.Series(MODEL_FEATURE_NAMES).values)
 #predicted_dYdX = predicted_dYdX.assign(absolute=np.abs(predicted_dYdX['dYdX'].values))
 #predicted_dYdX.sort_values('absolute', ascending=False, inplace=True)
