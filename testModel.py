@@ -43,7 +43,7 @@ parser.add_argument("--database"  , type=str  , default=""  )
 parser.add_argument("--table"     , type=str  , default=""  )
 
 parser.add_argument("--alpha"     , type=float, default=1.0 )
-parser.add_argument("--topk"      , type=int  , default=3   )
+parser.add_argument("--topk"      , type=int  , default=5   )
 parser.add_argument("--verbose"   , action="store_true"     )
 
 def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTolerances ) :
@@ -67,16 +67,19 @@ def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTole
 	return resultValues
 
 def processClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE_NAMES, topk=5 ) :
+	droppedField_s = ['total_square','living_square','kitchen_square']
+	droppedIndex_s = [index for index,field in enumerate(MODEL_FEATURE_NAMES) if field in droppedField_s ]
+	
 	processedInputItem     = inputItem    [ MODEL_FEATURE_NAMES ]
 	processedClosestItem_s = closestItem_s[ MODEL_FEATURE_NAMES ]
 	
-	processedInputItem_numpy     = processedInputItem   .values
+	processedInputItem_numpy     = processedInputItem    .values
 	processedClosestItem_s_numpy = processedClosestItem_s.values
 	
 	processedInputItem_numpy     = processedInputItem_numpy   .reshape(1,-1) 
 	#processedClosestItem_s_numpy = processedClosestItem_s_numpy.reshape(1,-1) 
-	processedInputItem_numpy     = PREPROCESSOR_X.transform( processedInputItem_numpy     )
-	processedClosestItem_s_numpy = PREPROCESSOR_X.transform( processedClosestItem_s_numpy )
+	processedInputItem_numpy     = PREPROCESSOR_X.transform( processedInputItem_numpy     ); processedInputItem_numpy     = np.delete(processedInputItem_numpy    , droppedIndex_s, axis=1 )
+	processedClosestItem_s_numpy = PREPROCESSOR_X.transform( processedClosestItem_s_numpy ); processedClosestItem_s_numpy = np.delete(processedClosestItem_s_numpy, droppedIndex_s, axis=1 )
 	processedResult_s_numpy      = processedClosestItem_s_numpy - processedInputItem_numpy
 	processedResult_s_numpy      = np.linalg.norm( processedResult_s_numpy, axis=1 )
 	
