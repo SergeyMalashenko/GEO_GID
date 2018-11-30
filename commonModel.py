@@ -109,9 +109,8 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 		mask = (dataFrame[ columnName ] <= MAX_VALUE ) & mask
 	
 	dataFrame = dataFrame[ mask ]
-	
 	#dataFrame.drop(labels=['re-id','kitchen_square','living_square','floor_number'], axis=1, inplace=True)
-	dataFrame.drop(labels=['living_square','floor_number'], axis=1, inplace=True)
+	dataFrame = dataFrame.drop(labels=['living_square','floor_number'], axis=1, inplace=False)
 	if 're_id' in dataFrame.columns : dataFrame.drop(labels=['re_id'], axis=1, inplace=True)
 	#if 'id' in dataFrame.columns : dataFrame.drop(labels=['id',], axis=1, inplace=True )	
 	
@@ -171,7 +170,8 @@ class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
 		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
 	def __call__(self, dataBase, tableName, COLUMN_TYPE='NUMERICAL' ):
 		engine = create_engine( dataBase )
-		dataFrame = pd.read_sql_table( tableName, engine)
+		dataFrame = pd.read_sql('SELECT price,longitude,latitude,total_square,kitchen_square,living_square,number_of_rooms,floor_number,number_of_floors,exploitation_start_year FROM smartRealtor.real_estate_from_ads_api;', engine )
+		#dataFrame = pd.read_sql_table( tableName, engine)
 		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
 	def __processDataFrame(self, dataFrame, COLUMN_TYPE ):
 		if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
