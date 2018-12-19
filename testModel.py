@@ -140,7 +140,7 @@ limitsFileName  = args.limits
 
 inputDatabase   = args.database
 inputTable      = args.table
-inputTolerances = None if args.tolerances == "" else eval( "dict({})".format( args.tolerances ) ) 
+inputTolerances = dict() if args.tolerances == "" else eval( "dict({})".format( args.tolerances ) ) 
 
 alphaParam      = args.alpha
 topkParam       = args.topk
@@ -181,7 +181,8 @@ if inputDataSize > 0: # Check that input data is correct
 		
 		predicted_dX.sort_values( by=0, axis=1, ascending=False, inplace=True )
 		
-		inputTolerances = { name : abs(values[0]) for name, values in predicted_dX.iteritems() }
+		inputTolerances = { name : inputTolerances[name] if name in inputTolerances.keys() else abs(values[0]) for name, values in predicted_dX.iteritems() }
+		
 		#Get the closest items
 		if verboseFlag : print( inputTolerances )
 		closestItems = getClosestItemsInDatabase( inputRow, inputDatabase, inputTable, inputTolerances )
