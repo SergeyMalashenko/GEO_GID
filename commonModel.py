@@ -22,24 +22,8 @@ from sqlalchemy import create_engine
 FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square', 'distance_from_metro']
 INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors', 'exploitation_start_year' ]
 DATE_COLUMNS  = [ 're_created_at' ]
-#INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors' ]
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
 TARGET_COLUMN =   'price'
-
-CHARACTER_LENGTH = {
-	"total_square"  : 1., 
-	"living_square" : 1.,
-	"kitchen_square": 1.,
-	
-	"longitude"     : 0.01,
-	"latitude"      : 0.01,
-	
-	"number_of_floors" : 1.,
-	"number_of_rooms"  : 1.,
-	"floor_number"     : 1.,
-	
-	"exploitation_start_year" : 1.,
-}
 
 def check_float( x ):
 	try:
@@ -109,8 +93,9 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 		mask = (dataFrame[ columnName ] <= MAX_VALUE ) & mask
 	
 	dataFrame = dataFrame[ mask ]
-	#dataFrame.drop(labels=['re-id','kitchen_square','living_square','floor_number'], axis=1, inplace=True)
+	#dataFrame.drop(labels=['kitchen_square','living_square','floor_number'], axis=1, inplace=True)
 	dataFrame = dataFrame.drop(labels=['living_square','floor_number'], axis=1, inplace=False)
+	#dataFrame = dataFrame.drop(labels=['floor_number'], axis=1, inplace=False)
 	if 're_id' in dataFrame.columns : dataFrame.drop(labels=['re_id'], axis=1, inplace=True)
 	#if 'id' in dataFrame.columns : dataFrame.drop(labels=['id',], axis=1, inplace=True )	
 	
@@ -136,8 +121,8 @@ class LinearNet(torch.nn.Module):
 		return x3
 	def jacobian( self, x ):
 		x0 = torch.tensor( x, requires_grad=True)
-		x1 = torch.nn.functional.relu( self.fc1(x0) )
-		x2 = torch.nn.functional.relu( self.fc2(x1) )
+		x1 = torch.nn.functional.relu( self.bn1( self.fc1(x0) ) )
+		x2 = torch.nn.functional.relu( self.bn2( self.fc2(x1) ) )
 		x3 = self.fc3(x2).squeeze()
 		x3.backward()
 		return x0.grad
@@ -170,8 +155,8 @@ class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
 		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
 	def __call__(self, dataBase, tableName, COLUMN_TYPE='NUMERICAL' ):
 		engine = create_engine( dataBase )
-		dataFrame = pd.read_sql('SELECT price,longitude,latitude,total_square,kitchen_square,living_square,number_of_rooms,floor_number,number_of_floors,exploitation_start_year FROM smartRealtor.real_estate_from_ads_api;', engine )
-		#dataFrame = pd.read_sql_table( tableName, engine)
+		#dataFrame = pd.read_sql('SELECT price,longitude,latitude,total_square,kitchen_square,living_square,number_of_rooms,floor_number,number_of_floors,exploitation_start_year FROM smartRealtor.real_estate_from_ads_api;', engine )
+		dataFrame = pd.read_sql_table( tableName, engine)
 		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
 	def __processDataFrame(self, dataFrame, COLUMN_TYPE ):
 		if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]

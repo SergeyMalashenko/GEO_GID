@@ -1,19 +1,17 @@
 {
 	"total_square"    : 
 		{ "min" : 12    , "max" : 500  },
-	"living_square"   : 
-		{ "min" : 8     , "max" : 300  },
 	"kitchen_square"  : 
 		{ "min" : 4     , "max" : 100  },
 	"number_of_rooms" : 
 		{ "min" : 1     , "max" : 10   },
-	"floor_number"    : 
-		{ "min" : 1     , "max" : 50   },
 	"number_of_floors":
 		{ "min" : 2     , "max" : 50   },
 	"latitude"        : 
 		{ "min" : 56.10 , "max" : 56.50},
 	"longitude"       : 
-		{ "min" : 43.70 , "max" : 44.30}
+		{ "min" : 43.70 , "max" : 44.30},
+	"exploitation_start_year" :
+		{ "min" : 1855  , "max" : 2014 }
 }
 

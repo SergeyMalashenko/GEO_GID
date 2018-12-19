@@ -112,6 +112,7 @@ def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, drop
 	dX_base_numpy   = (Y_base_numpy*threshold)/dYdX_base_numpy
 	
 	Y_numpy         = preprocessorY.inverse_transform( Y_base_numpy )
+	
 	dYdX_numpy      = dYdX_base_numpy
 	dX_numpy        = dX_base_numpy/X_scale 
 	
@@ -182,7 +183,7 @@ if inputDataSize > 0: # Check that input data is correct
 		
 		inputTolerances = { name : abs(values[0]) for name, values in predicted_dX.iteritems() }
 		#Get the closest items
-		#print( inputTolerances )
+		if verboseFlag : print( inputTolerances )
 		closestItems = getClosestItemsInDatabase( inputRow, inputDatabase, inputTable, inputTolerances )
 		#Process the closest items
 		pricePerSquareMedian, pricePerSquareMean, pricePerSquareMax, pricePerSquareMin = 0, 0, 0, 0
@@ -205,7 +206,7 @@ if inputDataSize > 0: # Check that input data is correct
 		print( "Min value       {:,}".format( int( pricePerSquareMin   *inputRow[['total_square']].values[0] ) ) )
 		
 		if verboseFlag :
-			print( closestItems[['price','total_square']].to_json( orient='records') )
+			print( closestItems[['price','total_square','exploitation_start_year']].to_json( orient='records') )
 		else :
 			print( closestItems[['re_id']].to_json( orient='records') )
 		

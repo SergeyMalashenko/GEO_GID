@@ -17,7 +17,7 @@ from sklearn.linear_model  import LinearRegression
 
 from sklearn.preprocessing     import QuantileTransformer
 from sklearn.preprocessing     import LabelEncoder
-from sklearn.preprocessing     import MinMaxScaler, StandardScaler
+from sklearn.preprocessing     import MinMaxScaler, StandardScaler, MaxAbsScaler
 from sklearn.neighbors         import KNeighborsRegressor
 from sklearn.tree              import export_graphviz
 
@@ -300,8 +300,9 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	
 	FEATURE_DEFAULTS = ((X_dataFrame.max()+X_dataFrame.min())*0.5).to_dict()
 	
-	preprocessorY = MinMaxScaler()
+	#preprocessorY = MinMaxScaler()
 	#preprocessorY = StandardScaler()
+	preprocessorY = MaxAbsScaler()
 	preprocessorY.fit( Y_values )
 	preprocessorX = MinMaxScaler()
 	#preprocessorX = StandardScaler()
@@ -328,36 +329,41 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 	optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate, amsgrad=True )
 	scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=500, gamma=0.5)
 	
-	batch_size        = 256 
-	max_nbr_corrects_ = 0
-	model.train()
-	for t in range(8000):
-		X_numpyTrain, X_numpyTest, Y_numpyTrain, Y_numpyTest = train_test_split( X_values, Y_values, test_size=0.15 )
+	batch_size           = 256
+	average_nbr_corrects = 0; N = 100; alpha = 2./(N+1); 
+	current_nbr_corrects = 0;
+	
+	X_numpyTrainVal, X_numpyTest, Y_numpyTrainVal, Y_numpyTest = train_test_split( X_values, Y_values, test_size=0.0 )
+	X_torchTest   = torch.from_numpy( X_numpyTest.astype( np.float32 ) ).to( device )
+	Y_torchTest   = torch.from_numpy( Y_numpyTest.astype( np.float32 ) ).to( device )
+	X_torchTest_s = torch.split( X_torchTest, batch_size, dim=0 )
+	Y_torchTest_s = torch.split( Y_torchTest, batch_size, dim=0 )
+	
+	for t in range(15000):
+		model.train()
+		X_numpyTrain, X_numpyVal, Y_numpyTrain, Y_numpyVal = train_test_split( X_numpyTrainVal, Y_numpyTrainVal, test_size=0.25 )
 		
 		X_torchTrain = torch.from_numpy( X_numpyTrain.astype( np.float32 ) ).to( device )
-		X_torchTest  = torch.from_numpy( X_numpyTest .astype( np.float32 ) ).to( device )
-		
+		X_torchVal   = torch.from_numpy( X_numpyVal  .astype( np.float32 ) ).to( device )
 		Y_torchTrain = torch.from_numpy( Y_numpyTrain.astype( np.float32 ) ).to( device )
-		Y_torchTest  = torch.from_numpy( Y_numpyTest .astype( np.float32 ) ).to( device )
+		Y_torchVal   = torch.from_numpy( Y_numpyVal  .astype( np.float32 ) ).to( device )
 		
 		train_size     = X_numpyTrain.shape[0]
-		test_size      = X_numpyTest .shape[0]
+		val_size       = X_numpyVal  .shape[0]
 		
 		train_index_s  = torch.randperm( train_size )
 		X_torchTrain_s = X_torchTrain[ train_index_s ]
 		Y_torchTrain_s = Y_torchTrain[ train_index_s ]
-		
-		test_index_s   = torch.randperm( test_size )
-		X_torchTest_s  = X_torchTest [ test_index_s ]
-		Y_torchTest_s  = Y_torchTest [ test_index_s ]
+		val_index_s    = torch.randperm( val_size )
+		X_torchVal_s   = X_torchVal  [ val_index_s ]
+		Y_torchVal_s   = Y_torchVal  [ val_index_s ]
 		
 		X_torchTrain_s = torch.split( X_torchTrain, batch_size, dim=0 )
 		Y_torchTrain_s = torch.split( Y_torchTrain, batch_size, dim=0 )
+		X_torchVal_s   = torch.split( X_torchVal  , batch_size, dim=0 )
+		Y_torchVal_s   = torch.split( Y_torchVal  , batch_size, dim=0 )
 		
-		X_torchTest_s  = torch.split( X_torchTest , batch_size, dim=0 )
-		Y_torchTest_s  = torch.split( Y_torchTest , batch_size, dim=0 )
-		
-		length = ( len( X_torchTest_s ) - 1)*batch_size
+		length = ( len( X_torchVal_s ) - 1)*batch_size
 		#Train
 		for i in range( len(Y_torchTrain_s)-1 ):
 			x = X_torchTrain_s[i]
@@ -369,30 +375,50 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, seed=43, droppedColumns=[]
 			model.zero_grad()
 			loss.backward  ()
 			optimizer.step ()
-		#Test
-		loss_ = 0
-		Y_torchPredict   = torch.zeros( Y_torchTest.shape, dtype=torch.float32 ).to( device )
+		scheduler.step()
+		#Validate
+		model.eval()
+		ValLoss = 0
+		Y_torchPredict   = torch.zeros( Y_torchVal.shape, dtype=torch.float32 ).to( device )
 		Y_torchPredict_s = torch.split( Y_torchPredict, batch_size, dim=0 )
 		for i in range( len(Y_torchPredict_s)-1 ):
-			x      = X_torchTest_s[i]
-			y      = Y_torchTest_s[i]
+			x      = X_torchVal_s[i]
+			y      = Y_torchVal_s[i]
 			y_pred = model(x) 
 			
 			Y_torchPredict_s[i].copy_( y_pred )
-			loss_ += loss_fn( y_pred, y )
-		loss_ /= (len(Y_torchPredict_s)-1) 
-		
+			ValLoss += loss_fn( y_pred, y )
+		ValLoss /= (len(Y_torchPredict_s)-1) 
 		Y_numpyPredict = Y_torchPredict.detach().numpy()
 		
-		mean_squared_error_  = mean_squared_error    ( Y_numpyTest, Y_numpyPredict )
-		mean_absolute_error_ = mean_absolute_error   ( Y_numpyTest, Y_numpyPredict )
-		mean_median_error_   = median_absolute_error ( Y_numpyTest, Y_numpyPredict )
-		
 		threshold = 0.1; eps = 0.001
-		cur_nbr_corrects_ = np.sum( np.abs( (Y_numpyPredict - Y_numpyTest)/( Y_numpyTest + eps ) ) <= threshold )
-		max_nbr_corrects_ = max( cur_nbr_corrects_, max_nbr_corrects_ )
-		print( "epoch: {:6d}, loss: {:6.4f}, mean squared error: {:6.4f}, mean absolute error: {:6.4f}, mean median error: {:6.4f}, nbr_corrects=({}/{}/{})".format( t, loss_, mean_squared_error_, mean_absolute_error_, mean_median_error_, cur_nbr_corrects_, max_nbr_corrects_, length ) )
-		scheduler.step()
+		ValTrue_s   = np.sum( np.abs( (Y_numpyPredict - Y_numpyVal)/( Y_numpyVal + eps ) ) <= threshold )
+		ValFalse_s  = np.sum( np.abs( (Y_numpyPredict - Y_numpyVal)/( Y_numpyVal + eps ) ) >  threshold )
+		ValAccuracy = float(ValTrue_s)/(ValTrue_s + ValFalse_s)
+		
+		TestLoss = 0; TestAccuracy = 0;
+		if Y_torchTest.nelement() > 0 :
+			model.eval()
+			TestLoss = 0
+			Y_torchPredict   = torch.zeros( Y_torchTest.shape, dtype=torch.float32 ).to( device )
+			Y_torchPredict_s = torch.split( Y_torchPredict, batch_size, dim=0 )
+			for i in range( len(Y_torchPredict_s)-1 ):
+				x      = X_torchTest_s[i]
+				y      = Y_torchTest_s[i]
+				y_pred = model(x) 
+				
+				Y_torchPredict_s[i].copy_( y_pred )
+				TestLoss += loss_fn( y_pred, y )
+			TestLoss /= (len(Y_torchPredict_s)-1) 
+			Y_numpyPredict = Y_torchPredict.detach().numpy()
+			
+			threshold = 0.1; eps = 0.001
+			TestTrue_s   = np.sum( np.abs( (Y_numpyPredict - Y_numpyTest)/( Y_numpyTest + eps ) ) <= threshold )
+			TestFalse_s  = np.sum( np.abs( (Y_numpyPredict - Y_numpyTest)/( Y_numpyTest + eps ) ) >  threshold )
+			TestAccuracy = float(TestTrue_s)/(TestTrue_s + TestFalse_s)
+		
+		print( "epoch: {:6d}, val_loss: {:6.4f}, val_acc: {:6.4f}, test_loss: {:6.4f}, test_acc: {:6.4f}".format( t, ValLoss, ValAccuracy, TestLoss, TestAccuracy ) )
+		
 	# Check model
 	model.eval()
 	
@@ -531,9 +557,13 @@ trainDataFrame = None
 if inputDatabase != "" and inputTable != "" : 
 	trainDataFrame = loadDataFrame()( inputDatabase, inputTable )
 
+#print( trainDataFrame.describe() )
+
 trainDataFrame = limitDataUsingLimitsFromFilename( trainDataFrame, limitsFileName )
 trainDataFrame = trainDataFrame.select_dtypes(include=['number'])
 trainDataFrame = limitDataUsingProcentiles       ( trainDataFrame )
+
+print( trainDataFrame.describe() )
 
 trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
 trainedModelPacket, ( Y_predict, Y_test ) = trainNeuralNetworkModel   ( trainDataFrame, TARGET_COLUMN, seed )
