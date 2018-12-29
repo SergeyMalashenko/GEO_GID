@@ -19,7 +19,8 @@ import torch.optim
 
 from sqlalchemy import create_engine
 
-FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square', 'distance_from_metro']
+FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square', 'distance_to_metro']
+#FLOAT_COLUMNS = [ 'price', 'longitude', 'latitude', 'total_square', 'living_square', 'kitchen_square']
 INT_COLUMNS   = [ 'number_of_rooms', 'floor_number', 'number_of_floors', 'exploitation_start_year' ]
 DATE_COLUMNS  = [ 're_created_at' ]
 STR_COLUMNS   = [ 'type', 'bulding_type' ]
@@ -155,8 +156,8 @@ class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
 		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
 	def __call__(self, dataBase, tableName, COLUMN_TYPE='NUMERICAL' ):
 		engine = create_engine( dataBase )
-		#dataFrame = pd.read_sql('SELECT price,longitude,latitude,total_square,kitchen_square,living_square,number_of_rooms,floor_number,number_of_floors,exploitation_start_year FROM smartRealtor.real_estate_from_ads_api;', engine )
-		dataFrame = pd.read_sql_table( tableName, engine)
+		dataFrame = pd.read_sql('SELECT price,longitude,latitude,total_square,kitchen_square,living_square,number_of_rooms,floor_number,number_of_floors,exploitation_start_year,distance_to_metro FROM smartRealtor.real_estate_from_ads_api;', engine )
+		#dataFrame = pd.read_sql_table( tableName, engine)
 		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
 	def __processDataFrame(self, dataFrame, COLUMN_TYPE ):
 		if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
@@ -176,9 +177,9 @@ class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
 		
 		subset = None
 		if 'price' in dataFrame.columns : 
-			subset=['price', 'total_square', 'number_of_rooms' ]	
+			subset=['price', 'total_square', 'number_of_rooms', 'longitude', 'latitude' ]	
 		else :
-			subset=['total_square', 'number_of_rooms' ]	
+			subset=['total_square', 'number_of_rooms', 'longitude', 'latitude' ]	
 		dataFrame.drop_duplicates(subset=subset, keep='first', inplace=True)	
 		
 		return dataFrame
