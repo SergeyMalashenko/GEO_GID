@@ -56,7 +56,9 @@ def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTole
 	
 	processedLimits = dict()
 	for ( field, tolerance ) in processedTolerances.items() :
-		processedLimits[field] = ( inputSeries[field] - abs( tolerance ), inputSeries[field] + abs( tolerance ) )
+		if tolerance != np.inf :
+			processedLimits[field] = ( inputSeries[field] - abs( tolerance ), inputSeries[field] + abs( tolerance ) )
+	
 	sql_query  = """SELECT * FROM {} WHERE """.format( inputTable )
 	sql_query += """ AND """.join( "{1} <= {0} AND {0} <= {2}".format( field, min_value, max_value ) for ( field, (min_value, max_value) ) in processedLimits.items() )	
 	
@@ -141,6 +143,8 @@ limitsFileName  = args.limits
 inputDatabase   = args.database
 inputTable      = args.table
 inputTolerances = dict() if args.tolerances == "" else eval( "dict({})".format( args.tolerances ) ) 
+
+print( inputTolerances )
 
 alphaParam      = args.alpha
 topkParam       = args.topk
