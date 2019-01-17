@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import _pickle           as cPickle
 
 import itertools
+import datetime
 import argparse
 import types
 import torch
@@ -46,7 +47,7 @@ parser.add_argument("--alpha"     , type=float, default=1.0 )
 parser.add_argument("--topk"      , type=int  , default=5   )
 parser.add_argument("--verbose"   , action="store_true"     )
 
-def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTolerances ) :
+def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTolerances, limitWithDate=True ) :
 	engine = create_engine( inputDataBase )
 	
 	inputTolerancesFields = set( inputTolerances.keys() )
@@ -61,6 +62,12 @@ def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTole
 	
 	sql_query  = """SELECT * FROM {} WHERE """.format( inputTable )
 	sql_query += """ AND """.join( "{1} <= {0} AND {0} <= {2}".format( field, min_value, max_value ) for ( field, (min_value, max_value) ) in processedLimits.items() )	
+	
+	if limitWithDate == True:
+		currentDate  = datetime.date.today()
+		deltaDate    = datetime.timedelta(days=90)
+		updatedDate  = currentDate - deltaDate
+		sql_query += """ AND """ + """created_at BETWEEN '{}' AND '{}'  """.format( updatedDate, currentDate )
 	
 	resultValues = pd.read_sql_query( sql_query, engine)
 	subset=['price', 'total_square', 'number_of_rooms' ]	
@@ -144,8 +151,6 @@ inputDatabase   = args.database
 inputTable      = args.table
 inputTolerances = dict() if args.tolerances == "" else eval( "dict({})".format( args.tolerances ) ) 
 
-print( inputTolerances )
-
 alphaParam      = args.alpha
 topkParam       = args.topk
 verboseFlag     = args.verbose
@@ -211,7 +216,8 @@ if inputDataSize > 0: # Check that input data is correct
 		print( "Min value       {:,}".format( int( pricePerSquareMin   *inputRow[['total_square']].values[0] ) ) )
 		
 		if verboseFlag :
-			print( closestItems[['price','total_square','exploitation_start_year']].to_json( orient='records') )
+			print( closestItems[['price','total_square','exploitation_start_year','created_at']] )
+			#print( closestItems[['price','total_square','exploitation_start_year','created_at']].to_json( orient='records') )
 		else :
 			print( closestItems[['re_id']].to_json( orient='records') )
 		
