@@ -47,7 +47,7 @@ parser.add_argument("--alpha"     , type=float, default=1.0 )
 parser.add_argument("--topk"      , type=int  , default=5   )
 parser.add_argument("--verbose"   , action="store_true"     )
 
-def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTolerances, limitWithDate=True ) :
+def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTolerances, limitWithDate=False ) :
 	engine = create_engine( inputDataBase )
 	
 	inputTolerancesFields = set( inputTolerances.keys() )
@@ -86,7 +86,10 @@ def processClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE
 	processedClosestItem_s_numpy = processedClosestItem_s.values
 	
 	processedInputItem_numpy     = processedInputItem_numpy   .reshape(1,-1) 
-	#processedClosestItem_s_numpy = processedClosestItem_s_numpy.reshape(1,-1) 
+	#processedClosestItem_s_numpy = processedClosestItem_s_numpy.reshape(1,-1)
+	
+	print( processedClosestItem_s )
+	 
 	processedInputItem_numpy     = PREPROCESSOR_X.transform( processedInputItem_numpy     ); processedInputItem_numpy     = np.delete(processedInputItem_numpy    , droppedIndex_s, axis=1 )
 	processedClosestItem_s_numpy = PREPROCESSOR_X.transform( processedClosestItem_s_numpy ); processedClosestItem_s_numpy = np.delete(processedClosestItem_s_numpy, droppedIndex_s, axis=1 )
 	processedResult_s_numpy      = processedClosestItem_s_numpy - processedInputItem_numpy
@@ -197,6 +200,7 @@ if inputDataSize > 0: # Check that input data is correct
 		closestItems = getClosestItemsInDatabase( inputRow, inputDatabase, inputTable, inputTolerances )
 		#Process the closest items
 		pricePerSquareMedian, pricePerSquareMean, pricePerSquareMax, pricePerSquareMin = 0, 0, 0, 0
+		pricePerSquareValues = None
 		if not closestItems.empty :
 			closestItems = processClosestItems( inputRow, closestItems, PREPROCESSOR_X, MODEL_FEATURE_NAMES )
 			
@@ -208,12 +212,28 @@ if inputDataSize > 0: # Check that input data is correct
 			pricePerSquareMean   = np.mean  ( pricePerSquareValues )
 			pricePerSquareMax    = np.max   ( pricePerSquareValues )
 			pricePerSquareMin    = np.min   ( pricePerSquareValues )
+		predictedPrice = int( predicted_Y.values[0]                                     ) 
+		medianPrice    = int( pricePerSquareMedian*inputRow[['total_square']].values[0] ) 
+		meanPrice      = int( pricePerSquareMean  *inputRow[['total_square']].values[0] ) 
+		maxPrice       = int( pricePerSquareMax   *inputRow[['total_square']].values[0] )
+		minPrice       = int( pricePerSquareMin   *inputRow[['total_square']].values[0] )
 		
-		print( "Predicted value {:,}".format( int( predicted_Y.values[0] ) ) )
-		print( "Median value    {:,}".format( int( pricePerSquareMedian*inputRow[['total_square']].values[0] ) ) )
-		print( "Mean value      {:,}".format( int( pricePerSquareMean  *inputRow[['total_square']].values[0] ) ) )
-		print( "Max value       {:,}".format( int( pricePerSquareMax   *inputRow[['total_square']].values[0] ) ) )
-		print( "Min value       {:,}".format( int( pricePerSquareMin   *inputRow[['total_square']].values[0] ) ) )
+		resultPrice          = predictedPrice if minPrice < predictedPrice and predictedPrice < maxPrice else medianPrice
+		pricePerSquareResult = resultPrice / inputRow[['total_square']].values[0] 
+		resultWeights        = [1,1,1,1,1]
+		if not closestItems.empty :
+			resultWeights = ( pricePerSquareValues / pricePerSquareResult )
+			resultWeights/= resultWeights.size
+			resultWeights = resultWeights.tolist()
+		
+		print( "Result value    {:,}".format( resultPrice    ) )
+		print( "Result weights  "+" ".join("{:,.2f}".format(weight) for weight in resultWeights ) )
+		
+		print( "Predicted value {:,}".format( predictedPrice ) )
+		print( "Median value    {:,}".format( medianPrice    ) )
+		print( "Mean value      {:,}".format( meanPrice      ) )
+		print( "Max value       {:,}".format( maxPrice       ) )
+		print( "Min value       {:,}".format( minPrice       ) )
 		
 		if verboseFlag :
 			print( closestItems[['price','total_square','exploitation_start_year','created_at']] )
