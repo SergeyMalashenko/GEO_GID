@@ -223,7 +223,7 @@ if inputDataSize > 0: # Check that input data is correct
 		resultWeights        = [1,1,1,1,1]
 		if not closestItems.empty :
 			resultWeights = ( pricePerSquareValues / pricePerSquareResult )
-			resultWeights/= resultWeights.size
+			#resultWeights/= resultWeights.size
 			resultWeights = resultWeights.tolist()
 		
 		print( "Result value    {:,}".format( resultPrice    ) )
