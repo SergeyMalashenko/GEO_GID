@@ -222,7 +222,8 @@ if inputDataSize > 0: # Check that input data is correct
 		pricePerSquareResult = resultPrice / inputRow[['total_square']].values[0] 
 		resultWeights        = [1,1,1,1,1]
 		if not closestItems.empty :
-			resultWeights = ( pricePerSquareValues / pricePerSquareResult )
+			#resultWeights = ( pricePerSquareValues / pricePerSquareResult )
+			resultWeights = ( pricePerSquareResult / pricePerSquareValues )
 			#resultWeights/= resultWeights.size
 			resultWeights = resultWeights.tolist()
 		
