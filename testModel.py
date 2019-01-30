@@ -197,7 +197,7 @@ if inputDataSize > 0: # Check that input data is correct
 		inputTolerances = { name : inputTolerances[name] if name in inputTolerances.keys() else abs(values[0]) for name, values in predicted_dX.iteritems() }
 		del inputTolerances['number_of_rooms']
 		del inputTolerances['kitchen_square' ]
-		del inputTolerances['total_square'   ]
+		#del inputTolerances['total_square'   ]
 		
 		#Get the closest items
 		if verboseFlag : print( inputTolerances )
