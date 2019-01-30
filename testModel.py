@@ -99,7 +99,7 @@ def processClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE
 	index_s = processedResult_s_numpy.argsort()[:topk] 
 	return closestItem_s.iloc[index_s]
 
-def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, droppedColumns=[], threshold=0.05 ):
+def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, droppedColumns=[], threshold=0.1 ):
 	import warnings
 	warnings.filterwarnings('ignore')
 	
