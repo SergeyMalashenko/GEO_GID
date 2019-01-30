@@ -68,6 +68,7 @@ def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTole
 		deltaDate    = datetime.timedelta(days=90)
 		updatedDate  = currentDate - deltaDate
 		sql_query += """ AND """ + """created_at BETWEEN '{}' AND '{}'  """.format( updatedDate, currentDate )
+	#print( sql_query )
 	
 	resultValues = pd.read_sql_query( sql_query, engine)
 	subset=['price', 'total_square', 'number_of_rooms' ]	
@@ -88,7 +89,7 @@ def processClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE
 	processedInputItem_numpy     = processedInputItem_numpy   .reshape(1,-1) 
 	#processedClosestItem_s_numpy = processedClosestItem_s_numpy.reshape(1,-1)
 	
-	print( processedClosestItem_s )
+	#print( processedClosestItem_s )
 	 
 	processedInputItem_numpy     = PREPROCESSOR_X.transform( processedInputItem_numpy     ); processedInputItem_numpy     = np.delete(processedInputItem_numpy    , droppedIndex_s, axis=1 )
 	processedClosestItem_s_numpy = PREPROCESSOR_X.transform( processedClosestItem_s_numpy ); processedClosestItem_s_numpy = np.delete(processedClosestItem_s_numpy, droppedIndex_s, axis=1 )
@@ -194,6 +195,9 @@ if inputDataSize > 0: # Check that input data is correct
 		predicted_dX.sort_values( by=0, axis=1, ascending=False, inplace=True )
 		
 		inputTolerances = { name : inputTolerances[name] if name in inputTolerances.keys() else abs(values[0]) for name, values in predicted_dX.iteritems() }
+		del inputTolerances['number_of_rooms']
+		del inputTolerances['kitchen_square' ]
+		del inputTolerances['total_square'   ]
 		
 		#Get the closest items
 		if verboseFlag : print( inputTolerances )
@@ -237,7 +241,7 @@ if inputDataSize > 0: # Check that input data is correct
 		print( "Min value       {:,}".format( minPrice       ) )
 		
 		if verboseFlag :
-			print( closestItems[['price','total_square','exploitation_start_year','created_at']] )
+			print( closestItems[['price','total_square','exploitation_start_year','created_at','floor_number','number_of_floors']] )
 			#print( closestItems[['price','total_square','exploitation_start_year','created_at']].to_json( orient='records') )
 		else :
 			print( closestItems[['re_id']].to_json( orient='records') )
