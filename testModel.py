@@ -47,6 +47,8 @@ parser.add_argument("--alpha"     , type=float, default=1.0 )
 parser.add_argument("--topk"      , type=int  , default=5   )
 parser.add_argument("--verbose"   , action="store_true"     )
 
+parser.add_argument("--analysis"  , action="store_true"     )
+
 def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTolerances, limitWithDate=False ) :
 	engine = create_engine( inputDataBase )
 	
@@ -68,7 +70,6 @@ def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTole
 		deltaDate    = datetime.timedelta(days=90)
 		updatedDate  = currentDate - deltaDate
 		sql_query += """ AND """ + """created_at BETWEEN '{}' AND '{}'  """.format( updatedDate, currentDate )
-	#print( sql_query )
 	
 	resultValues = pd.read_sql_query( sql_query, engine)
 	subset=['price', 'total_square', 'number_of_rooms' ]	
@@ -76,28 +77,138 @@ def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTole
 	
 	return resultValues
 
-def processClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE_NAMES, topk=5 ) :
-	droppedField_s = ['total_square','living_square','kitchen_square']
-	droppedIndex_s = [index for index,field in enumerate(MODEL_FEATURE_NAMES) if field in droppedField_s ]
+def getTopKClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE_NAMES, topk=5 ) :
+	if not closestItem_s.empty :
+		droppedField_s = ['total_square','living_square','kitchen_square']
+		droppedIndex_s = [index for index,field in enumerate(MODEL_FEATURE_NAMES) if field in droppedField_s ]
+		
+		processedInputItem     = inputItem    [ MODEL_FEATURE_NAMES ]
+		processedClosestItem_s = closestItem_s[ MODEL_FEATURE_NAMES ]
+		
+		processedInputItem_numpy     = processedInputItem    .values
+		processedClosestItem_s_numpy = processedClosestItem_s.values
+		processedInputItem_numpy     = processedInputItem_numpy.reshape(1,-1) 
+	 	
+		processedInputItem_numpy     = PREPROCESSOR_X.transform( processedInputItem_numpy     ); processedInputItem_numpy     = np.delete(processedInputItem_numpy    , droppedIndex_s, axis=1 )
+		processedClosestItem_s_numpy = PREPROCESSOR_X.transform( processedClosestItem_s_numpy ); processedClosestItem_s_numpy = np.delete(processedClosestItem_s_numpy, droppedIndex_s, axis=1 )
+		processedResult_s_numpy      = processedClosestItem_s_numpy - processedInputItem_numpy
+		processedResult_s_numpy      = np.linalg.norm( processedResult_s_numpy, axis=1 )
+		
+		index_s = processedResult_s_numpy.argsort()[:topk]
+		return closestItem_s.iloc[index_s]
+	else :
+		return closestItem_s
+
+ALPHA_BARGAINING   = 0.96
+ALPHA_FLOOR_NUMBER = np.array([
+	[ 1.00, 0.95, 0.97 ],
+	[ 1.05, 1.00, 1.02 ],
+	[ 1.03, 0.98, 1.00 ]
+])
+ALPHA_APARTMENT_CONDITION = np.array([
+	[     0, -4376, -7146, -11092, -15507 ],
+	[  4376,     0, -2771,  -6716, -11131 ],
+	[  7146,  2771,     0,  -3945,  -8361 ],
+	[ 11092,  6716,  3945,      0,  -4415 ],
+	[ 15507, 11131,  8361,   4415,      0 ]
+])
+
+def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=False ):
+	RESULT_PRICE_S = dict();
+	RESULT_PRICE_S['predictedPrice'] = int( predictedPrice.values[0]                                   ) 
+	RESULT_PRICE_S['medianPrice'   ] = int( 0 ) 
+	RESULT_PRICE_S['meanPrice'     ] = int( 0 ) 
+	RESULT_PRICE_S['maxPrice'      ] = int( 0 )
+	RESULT_PRICE_S['minPrice'      ] = int( 0 )
 	
-	processedInputItem     = inputItem    [ MODEL_FEATURE_NAMES ]
-	processedClosestItem_s = closestItem_s[ MODEL_FEATURE_NAMES ]
+	RESULT_ALPHA_S = dict()
+	RESULT_ALPHA_S["closestObjectsPrice"         ] = list()
+	RESULT_ALPHA_S["closestObjectsSquare"        ] = list()
+	RESULT_ALPHA_S["closestObjectsPricePerSquare"] = list()
+	RESULT_ALPHA_S["BargainingCorrection"        ] = list()
+	RESULT_ALPHA_S["FloorNumberCorrection"       ] = list()
+	RESULT_ALPHA_S["ApartmentConditionCorrection"] = list()
+	RESULT_ALPHA_S["ResultPrice"                 ] = int(0)
 	
-	processedInputItem_numpy     = processedInputItem    .values
-	processedClosestItem_s_numpy = processedClosestItem_s.values
+	if not closestItem_s.empty :
+		#Calculate required prices
+		#inputPrice           = predictedPrice.values[0]  
+		inputSquare          = inputItem['total_square'    ]
+		inputFloorNumber     = inputItem['floor_number'    ]
+		inputNumberOfFloors  = inputItem['number_of_floors']
+		#inputPricePerSquare  = inputPrice/inputSquare
+		
+		closestPrice_s          = np.array( list(map( float, closestItem_s['price'           ].values )) )
+		closestSquare_s         = np.array( list(map( float, closestItem_s['total_square'    ].values )) )
+		closestFloorNumber_s    = np.array( list(map( float, closestItem_s['floor_number'    ].values )) )
+		closestNumberOfFloors_s = np.array( list(map( float, closestItem_s['number_of_floors'].values )) )
+		closestPricePerSquare_s = closestPrice_s/closestSquare_s
+		
+		pricePerSquareMedian = np.median( closestPricePerSquare_s )
+		pricePerSquareMean   = np.mean  ( closestPricePerSquare_s )
+		pricePerSquareMax    = np.max   ( closestPricePerSquare_s )
+		pricePerSquareMin    = np.min   ( closestPricePerSquare_s )
+		
+		RESULT_PRICE_S['predictedPrice'] = int( predictedPrice.values[0]                                   ) 
+		RESULT_PRICE_S['medianPrice'   ] = int( pricePerSquareMedian*inputSquare ) 
+		RESULT_PRICE_S['meanPrice'     ] = int( pricePerSquareMean  *inputSquare ) 
+		RESULT_PRICE_S['maxPrice'      ] = int( pricePerSquareMax   *inputSquare )
+		RESULT_PRICE_S['minPrice'      ] = int( pricePerSquareMin   *inputSquare )
+		
+		#Calculate required coeffecients
+		inputPrice = int( pricePerSquareMedian*inputItem[['total_square']].values[0]) 
+		inputPricePerSquare  = inputPrice/inputSquare
+		
+		inputFloorStatus     = 1
+		inputFloorStatus     = 0 if inputFloorNumber == 1                   else inputFloorStatus
+		inputFloorStatus     = 2 if inputFloorNumber == inputNumberOfFloors else inputFloorStatus
+		
+		ALPHA_BARGAINING_S   = np.full( closestPrice_s.shape, ALPHA_BARGAINING                        )
+		ALPHA_FLOOR_NUMBER_S = np.full( closestPrice_s.shape, ALPHA_FLOOR_NUMBER[inputFloorStatus][1] )
+		ALPHA_FLOOR_NUMBER_S[ closestFloorNumber_s == 1                       ] = ALPHA_FLOOR_NUMBER[inputFloorStatus][0] 
+		ALPHA_FLOOR_NUMBER_S[ closestFloorNumber_s == closestNumberOfFloors_s ] = ALPHA_FLOOR_NUMBER[inputFloorStatus][2] 
+		
+		inputPricePerSquare     = inputPricePerSquare     * ALPHA_BARGAINING
+		closestPricePerSquare_s = closestPricePerSquare_s * ALPHA_BARGAINING 
+		closestPricePerSquare_s = closestPricePerSquare_s * ALPHA_FLOOR_NUMBER_S
+		
+		deltaPricePerSquare_s = inputPricePerSquare - closestPricePerSquare_s
+		
+		forward_index_s  = np.argsort( abs( deltaPricePerSquare_s ) )
+		backward_index_s = np.full( forward_index_s.shape, 0 ) 
+		for i, index in enumerate( forward_index_s ):
+			backward_index_s[index] = i
+		fltDeltaPricePerSquare_s = deltaPricePerSquare_s[ forward_index_s ]
+		intDeltaPricePerSquare_s = np.zeros((ALPHA_APARTMENT_CONDITION.shape[0], len(closestItem_s) ))
+		flt2intError_s           = np.zeros( ALPHA_APARTMENT_CONDITION.shape[0] )
+		
+		for i in range(ALPHA_APARTMENT_CONDITION.shape[0]):
+			AlphaApartmentCondition = ALPHA_APARTMENT_CONDITION[i]
+			flt2intError            = 0.
+			for j in range( len(closestItem_s) ):
+				fltDelta  = fltDeltaPricePerSquare_s[j]
+				Index     = np.argmin(np.abs( fltDelta - AlphaApartmentCondition + flt2intError )) 
+				intDelta  = AlphaApartmentCondition[ Index ]
+				intDeltaPricePerSquare_s[i][j] = intDelta
+				flt2intError += fltDelta - intDelta
+			flt2intError_s[i] = flt2intError
+		resDeltaPricePerSquare_s = intDeltaPricePerSquare_s[ np.argmin(flt2intError_s) ][ backward_index_s ]
 	
-	processedInputItem_numpy     = processedInputItem_numpy   .reshape(1,-1) 
-	#processedClosestItem_s_numpy = processedClosestItem_s_numpy.reshape(1,-1)
+		ALPHA_APP_CONDITION_S = resDeltaPricePerSquare_s/closestPricePerSquare_s 
+		
+		RESULT_ALPHA_S = dict()
+		RESULT_ALPHA_S["closestObjectsPrice"         ] = closestPrice_s         .tolist()
+		RESULT_ALPHA_S["closestObjectsSquare"        ] = closestSquare_s        .tolist()
+		RESULT_ALPHA_S["closestObjectsPricePerSquare"] = closestPricePerSquare_s.tolist()
+		
+		RESULT_ALPHA_S["BargainingCorrection"        ] = ALPHA_BARGAINING_S     .tolist()
+		RESULT_ALPHA_S["FloorNumberCorrection"       ] = ALPHA_FLOOR_NUMBER_S   .tolist()
+		RESULT_ALPHA_S["ApartmentConditionCorrection"] = ALPHA_APP_CONDITION_S  .tolist()
+		
+		closestPricePerSquare_s += resDeltaPricePerSquare_s
+		RESULT_ALPHA_S["ResultPrice"] = int(np.mean(closestPricePerSquare_s)*inputSquare/10000)*10000
 	
-	#print( processedClosestItem_s )
-	 
-	processedInputItem_numpy     = PREPROCESSOR_X.transform( processedInputItem_numpy     ); processedInputItem_numpy     = np.delete(processedInputItem_numpy    , droppedIndex_s, axis=1 )
-	processedClosestItem_s_numpy = PREPROCESSOR_X.transform( processedClosestItem_s_numpy ); processedClosestItem_s_numpy = np.delete(processedClosestItem_s_numpy, droppedIndex_s, axis=1 )
-	processedResult_s_numpy      = processedClosestItem_s_numpy - processedInputItem_numpy
-	processedResult_s_numpy      = np.linalg.norm( processedResult_s_numpy, axis=1 )
-	
-	index_s = processedResult_s_numpy.argsort()[:topk] 
-	return closestItem_s.iloc[index_s]
+	return RESULT_PRICE_S, RESULT_ALPHA_S
 
 def testNeuralNetworkModel( Model, preprocessorX, preprocessorY, dataFrame, droppedColumns=[], threshold=0.1 ):
 	import warnings
@@ -177,83 +288,46 @@ inputQuery = defaultQuery; inputQuery.update( userQuery )
 
 inputDataFrame = pd.DataFrame( data=inputQuery, index=[0] )
 
-#if 'floor_flag' in MODEL_FEATURES : 
-#	mask = ( inputDataFrame['floor_number'] == 1 ) | ( inputDataFrame['floor_number'] == inputDataFrame['number_of_floors'] )
-#	inputDataFrame['floor_flag'] = 1; inputDataFrame[ mask ]['floor_flag'] = 0;
-
 inputDataFrame = limitDataUsingLimitsFromFilename( inputDataFrame, limitsFileName )
 inputDataSize  = len( inputDataFrame.index ) 
 
 if inputDataSize > 0: # Check that input data is correct
 	for i in range( inputDataSize ) :
-		inputRow         = inputDataFrame                       .iloc[i]
-		inputRowForModel = inputDataFrame[ MODEL_FEATURE_NAMES ].iloc[i]
+		inputItem         = inputDataFrame                       .iloc[i]
+		inputItemForModel = inputDataFrame[ MODEL_FEATURE_NAMES ].iloc[i]
 		
-		predicted_Y, predicted_dYdX, predicted_dX = testNeuralNetworkModel   ( REGRESSION_MODEL, PREPROCESSOR_X, PREPROCESSOR_Y, inputRowForModel )
+		predicted_Y, predicted_dYdX, predicted_dX = testNeuralNetworkModel   ( REGRESSION_MODEL, PREPROCESSOR_X, PREPROCESSOR_Y, inputItemForModel )
 		predicted_dYdX.columns = MODEL_FEATURE_NAMES; predicted_dX  .columns = MODEL_FEATURE_NAMES
 		
 		predicted_dX.sort_values( by=0, axis=1, ascending=False, inplace=True )
 		
 		inputTolerances = { name : inputTolerances[name] if name in inputTolerances.keys() else abs(values[0]) for name, values in predicted_dX.iteritems() }
-		del inputTolerances['number_of_rooms']
-		del inputTolerances['kitchen_square' ]
-		#del inputTolerances['total_square'   ]
+		del inputTolerances['number_of_rooms']; del inputTolerances['kitchen_square' ]
 		
 		#Get the closest items
 		if verboseFlag : print( inputTolerances )
-		closestItems = getClosestItemsInDatabase( inputRow, inputDatabase, inputTable, inputTolerances )
+		closestItem_s = getClosestItemsInDatabase( inputItem, inputDatabase, inputTable, inputTolerances )
+		closestItem_s = getTopKClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE_NAMES, topk=topkParam )
 		#Process the closest items
-		pricePerSquareMedian, pricePerSquareMean, pricePerSquareMax, pricePerSquareMin = 0, 0, 0, 0
-		pricePerSquareValues = None
-		if not closestItems.empty :
-			closestItems = processClosestItems( inputRow, closestItems, PREPROCESSOR_X, MODEL_FEATURE_NAMES )
-			
-			resultTotalSquareValues = list( map( float, closestItems[['total_square']].values ) )
-			resultTotalPriceValues  = list( map( float, closestItems[['price'       ]].values ) )
-			
-			pricePerSquareValues = np.array(resultTotalPriceValues)/np.array(resultTotalSquareValues) 
-			pricePerSquareMedian = np.median( pricePerSquareValues )
-			pricePerSquareMean   = np.mean  ( pricePerSquareValues )
-			pricePerSquareMax    = np.max   ( pricePerSquareValues )
-			pricePerSquareMin    = np.min   ( pricePerSquareValues )
-		predictedPrice = int( predicted_Y.values[0]                                     ) 
-		medianPrice    = int( pricePerSquareMedian*inputRow[['total_square']].values[0] ) 
-		meanPrice      = int( pricePerSquareMean  *inputRow[['total_square']].values[0] ) 
-		maxPrice       = int( pricePerSquareMax   *inputRow[['total_square']].values[0] )
-		minPrice       = int( pricePerSquareMin   *inputRow[['total_square']].values[0] )
+		RESULT_PRICE_S, RESULT_ALPHA_S = processClosestItems( inputItem, closestItem_s, predicted_Y )
 		
-		resultPrice          = predictedPrice if minPrice < predictedPrice and predictedPrice < maxPrice else medianPrice
-		pricePerSquareResult = resultPrice / inputRow[['total_square']].values[0] 
-		resultWeights        = [1,1,1,1,1]
-		if not closestItems.empty :
-			#resultWeights = ( pricePerSquareValues / pricePerSquareResult )
-			resultWeights = ( pricePerSquareResult / pricePerSquareValues )
-			#resultWeights/= resultWeights.size
-			resultWeights = resultWeights.tolist()
+		print( "Predicted price: {:,}".format( RESULT_PRICE_S['predictedPrice'] ) )
+		print( "Median    price: {:,}".format( RESULT_PRICE_S['medianPrice'   ] ) )
+		print( "Mean      price: {:,}".format( RESULT_PRICE_S['meanPrice'     ] ) )
+		print( "Max       price: {:,}".format( RESULT_PRICE_S['maxPrice'      ] ) )
+		print( "Min       price: {:,}".format( RESULT_PRICE_S['minPrice'      ] ) )
 		
-		print( "Result value    {:,}".format( resultPrice    ) )
-		print( "Result weights  "+" ".join("{:,.2f}".format(weight) for weight in resultWeights ) )
+		print( "Closest objects        price: {:}".format( RESULT_ALPHA_S["closestObjectsPrice"         ] ) )
+		print( "Closest objects       square: {:}".format( RESULT_ALPHA_S["closestObjectsSquare"        ] ) )
+		print( "Closest objects price/square: {:}".format( RESULT_ALPHA_S["closestObjectsPricePerSquare"] ) )
 		
-		print( "Predicted value {:,}".format( predictedPrice ) )
-		print( "Median value    {:,}".format( medianPrice    ) )
-		print( "Mean value      {:,}".format( meanPrice      ) )
-		print( "Max value       {:,}".format( maxPrice       ) )
-		print( "Min value       {:,}".format( minPrice       ) )
+		print( "Bargaining          corrections: {:}".format( RESULT_ALPHA_S["BargainingCorrection"        ] ) )
+		print( "Floor number        corrections: {:}".format( RESULT_ALPHA_S["FloorNumberCorrection"       ] ) )
+		print( "Apartment condition corrections: {:}".format( RESULT_ALPHA_S["ApartmentConditionCorrection"] ) )
+		
+		print( "Result price                   : {:}".format( RESULT_ALPHA_S["ResultPrice"                 ] ) )
 		
 		if verboseFlag :
-			print( closestItems[['price','total_square','exploitation_start_year','created_at','floor_number','number_of_floors']] )
-			#print( closestItems[['price','total_square','exploitation_start_year','created_at']].to_json( orient='records') )
+			print( closestItem_s[['price','total_square','exploitation_start_year','created_at','floor_number','number_of_floors']] )
 		else :
-			print( closestItems[['re_id']].to_json( orient='records') )
-		
-#predicted_dYdX = predicted_dYdX.assign(features=pd.Series(MODEL_FEATURE_NAMES).values)
-#predicted_dYdX = predicted_dYdX.assign(absolute=np.abs(predicted_dYdX['dYdX'].values))
-#predicted_dYdX.sort_values('absolute', ascending=False, inplace=True)
-#predicted_dX   = predicted_dX.assign(features=pd.Series(MODEL_FEATURE_NAMES).values)
-
-#resultTotalSquareValues = list( map( float, resultValues[['total_square']].values ) )
-#resultTotalPriceValues  = list( map( float, resultValues[['price']].values ) )
-#pricePerSquareValues = np.array(resultTotalPriceValues)/np.array(resultTotalSquareValues) 
-#pricePerSquareMedian = np.median( pricePerSquareValues )
-#pricePerSquareMean   = np.mean  ( pricePerSquareValues )
-#return resultValues, pricePerSquareMedian*inputSeries[['total_square']], pricePerSquareMean*inputSeries[['total_square']]
+			print( closestItem_s[['re_id']].to_json( orient='records') )
