@@ -131,6 +131,7 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 	RESULT_ALPHA_S["deltaApartmentConditionPricePerSquare"] = np.array([])
 	RESULT_ALPHA_S["WeightCoefficient"                    ] = np.array([])     
 	RESULT_ALPHA_S["WeightedPricePerSquare"               ] = np.array([])
+	RESULT_ALPHA_S["ResultPricePerSquare"                 ] = int(0) 
 	RESULT_ALPHA_S["ResultPrice"                          ] = int( predictedPrice.values[0] )
 	
 	if not closestItem_s.empty :
@@ -224,8 +225,10 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 		RESULT_ALPHA_S["WeightedPricePerSquare"               ] = weightedPricePerSquare_s
 		
 		closestPricePerSquare_s += resDeltaPricePerSquare_s
-		RESULT_ALPHA_S["ResultCondition"] = minFLT2INTError_arg 
-		RESULT_ALPHA_S["ResultPrice"    ] = np.mean(closestPricePerSquare_s)*inputSquare
+		resultPricePerSquare = np.mean(closestPricePerSquare_s)
+		RESULT_ALPHA_S["ResultPricePerSquare"] = resultPricePerSquare 
+		RESULT_ALPHA_S["ResultCondition"     ] = minFLT2INTError_arg 
+		RESULT_ALPHA_S["ResultPrice"         ] = resultPricePerSquare*inputSquare
 	
 	return RESULT_PRICE_S, RESULT_ALPHA_S
 
@@ -344,6 +347,7 @@ if inputDataSize > 0: # Check that input data is correct
 		print( "Weigth          coefficients: "+",".join(['{:9.2f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["WeightCoefficient"                    ].astype(np.float32).tolist()) ) )
 		print( "Weighted        price/square: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["WeightedPricePerSquare"               ].astype(np.int32  ).tolist()) ) )
 		print( "Result             condition: {:9d}".format( int(RESULT_ALPHA_S["ResultCondition"])         ) )
+		print( "Result          price/square: {:9d}".format( int(RESULT_ALPHA_S["ResultPricePerSquare"])    ) )
 		print( "Result                 price: {:9d}".format( int(RESULT_ALPHA_S["ResultPrice"])             ) )
 		print( "Rounded result         price: {:9d}".format( int(RESULT_ALPHA_S["ResultPrice"]/10000)*10000 ) )
 		
