@@ -183,28 +183,29 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 			backward_index_s[index] = i
 		fltDeltaPricePerSquare_s = deltaPricePerSquare_s[ forward_index_s ]
 		intDeltaPricePerSquare_s = np.zeros((ALPHA_APARTMENT_CONDITION.shape[0], len(closestItem_s) ))
-		flt2intError_s           = np.zeros( ALPHA_APARTMENT_CONDITION.shape[0] )
+		FLT2INTError_s           = np.zeros( ALPHA_APARTMENT_CONDITION.shape[0] )
 		
 		for i in range(ALPHA_APARTMENT_CONDITION.shape[0]):
 			AlphaApartmentCondition = ALPHA_APARTMENT_CONDITION[i]
-			flt2intError            = 0.
+			FLT2INTError            = 0.
 			for j in range( len(closestItem_s) ):
 				fltDelta  = fltDeltaPricePerSquare_s[j]
-				Index     = np.argmin(np.abs( fltDelta - AlphaApartmentCondition + flt2intError )) 
+				Index     = np.argmin(np.abs( fltDelta - AlphaApartmentCondition + FLT2INTError )) 
 				intDelta  = AlphaApartmentCondition[ Index ]
 				intDeltaPricePerSquare_s[i][j] = intDelta
-				flt2intError += fltDelta - intDelta
-			flt2intError_s[i] = flt2intError
-		resDeltaPricePerSquare_s = intDeltaPricePerSquare_s[ np.argmin(flt2intError_s) ][ backward_index_s ]
-		resflt2intError          = np.min(flt2intError_s) 
-		AlphaApartmentCondition  = ALPHA_APARTMENT_CONDITION[ np.argmin(flt2intError_s) ]
+				FLT2INTError += fltDelta - intDelta
+			FLT2INTError_s[i] = FLT2INTError
+		minFLT2INTError_arg = np.argmin(FLT2INTError_s) 
+		resDeltaPricePerSquare_s = intDeltaPricePerSquare_s [ minFLT2INTError_arg ][ backward_index_s ]
+		AlphaApartmentCondition  = ALPHA_APARTMENT_CONDITION[ minFLT2INTError_arg ]
 
 		if verboseFlag :
+			#resflt2intError          = np.min(flt2intError_s) 
 			#print( "inputPricePerSquare    {:}".format(                                           ) )
 			print( "fltDeltaPricePerSquare  {:}".format( deltaPricePerSquare_s   .astype(np.int32) ) )
 			print( "alphaApartmentCondition {:}".format( AlphaApartmentCondition                   ) )
 			print( "intDeltaPricePerSquare  {:}".format( resDeltaPricePerSquare_s.astype(np.int32) ) )
-			print( "resFLT2INTError         {:}".format( resflt2intError                           ) )
+			#print( "resFLT2INTError         {:}".format( resflt2intError                           ) )
 		
 		ALPHA_APP_CONDITION_S = resDeltaPricePerSquare_s/closestPricePerSquare_s 
 		
@@ -215,7 +216,6 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 		
 		RESULT_ALPHA_S["BargainingCorrection"        ] = ALPHA_BARGAINING_S     
 		RESULT_ALPHA_S["FloorNumberCorrection"       ] = ALPHA_FLOOR_NUMBER_S   
-		RESULT_ALPHA_S["ApartmentConditionCorrection"] = ALPHA_APP_CONDITION_S  
 		
 		weightCoefficient_s      = np.full( len(closestItem_s), 1./len(closestItem_s) )
 		weightedPricePerSquare_s = closestPricePerSquare_s * weightCoefficient_s
@@ -224,8 +224,8 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 		RESULT_ALPHA_S["WeightedPricePerSquare"               ] = weightedPricePerSquare_s
 		
 		closestPricePerSquare_s += resDeltaPricePerSquare_s
-		
-		RESULT_ALPHA_S["ResultPrice"] = np.mean(closestPricePerSquare_s)*inputSquare
+		RESULT_ALPHA_S["ResultCondition"] = minFLT2INTError_arg 
+		RESULT_ALPHA_S["ResultPrice"    ] = np.mean(closestPricePerSquare_s)*inputSquare
 	
 	return RESULT_PRICE_S, RESULT_ALPHA_S
 
@@ -343,6 +343,7 @@ if inputDataSize > 0: # Check that input data is correct
 		print( "Delta           price/square: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["deltaApartmentConditionPricePerSquare"].astype(np.int32  ).tolist()) ) )
 		print( "Weigth          coefficients: "+",".join(['{:9.2f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["WeightCoefficient"                    ].astype(np.float32).tolist()) ) )
 		print( "Weighted        price/square: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["WeightedPricePerSquare"               ].astype(np.int32  ).tolist()) ) )
+		print( "Result             condition: {:9d}".format( int(RESULT_ALPHA_S["ResultCondition"])         ) )
 		print( "Result                 price: {:9d}".format( int(RESULT_ALPHA_S["ResultPrice"])             ) )
 		print( "Rounded result         price: {:9d}".format( int(RESULT_ALPHA_S["ResultPrice"]/10000)*10000 ) )
 		
