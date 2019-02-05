@@ -124,13 +124,19 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 	RESULT_ALPHA_S = dict()
 	RESULT_ALPHA_S["closestObjectsPrice"                  ] = np.array([])
 	RESULT_ALPHA_S["closestObjectsSquare"                 ] = np.array([]) 
-	RESULT_ALPHA_S["closestObjectsPricePerSquare"         ] = np.array([])
+	
+	RESULT_ALPHA_S["closestObjectsPricePerSquare_0"       ] = np.array([])
+	RESULT_ALPHA_S["closestObjectsPricePerSquare_1"       ] = np.array([])
+	RESULT_ALPHA_S["closestObjectsPricePerSquare_2"       ] = np.array([])
+	RESULT_ALPHA_S["closestObjectsPricePerSquare_3"       ] = np.array([])
+	
 	RESULT_ALPHA_S["BargainingCorrection"                 ] = np.array([])
 	RESULT_ALPHA_S["FloorNumberCorrection"                ] = np.array([])
 	RESULT_ALPHA_S["ApartmentConditionCorrection"         ] = np.array([])
 	RESULT_ALPHA_S["deltaApartmentConditionPricePerSquare"] = np.array([])
 	RESULT_ALPHA_S["WeightCoefficient"                    ] = np.array([])     
 	RESULT_ALPHA_S["WeightedPricePerSquare"               ] = np.array([])
+	
 	RESULT_ALPHA_S["ResultPricePerSquare"                 ] = int(0) 
 	RESULT_ALPHA_S["ResultPrice"                          ] = int( predictedPrice.values[0] )
 	
@@ -142,16 +148,16 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 		inputNumberOfFloors  = inputItem['number_of_floors']
 		#inputPricePerSquare  = inputPrice/inputSquare
 		
-		closestPrice_s          = np.array( list(map( float, closestItem_s['price'           ].values )) )
-		closestSquare_s         = np.array( list(map( float, closestItem_s['total_square'    ].values )) )
-		closestFloorNumber_s    = np.array( list(map( float, closestItem_s['floor_number'    ].values )) )
-		closestNumberOfFloors_s = np.array( list(map( float, closestItem_s['number_of_floors'].values )) )
-		closestPricePerSquare_s = closestPrice_s/closestSquare_s
+		closestPrice_s            = np.array( list(map( float, closestItem_s['price'           ].values )) )
+		closestSquare_s           = np.array( list(map( float, closestItem_s['total_square'    ].values )) )
+		closestFloorNumber_s      = np.array( list(map( float, closestItem_s['floor_number'    ].values )) )
+		closestNumberOfFloors_s   = np.array( list(map( float, closestItem_s['number_of_floors'].values )) )
+		closestPricePerSquare_s_0 = closestPrice_s/closestSquare_s
 		
-		pricePerSquareMedian = np.median( closestPricePerSquare_s )
-		pricePerSquareMean   = np.mean  ( closestPricePerSquare_s )
-		pricePerSquareMax    = np.max   ( closestPricePerSquare_s )
-		pricePerSquareMin    = np.min   ( closestPricePerSquare_s )
+		pricePerSquareMedian = np.median( closestPricePerSquare_s_0 )
+		pricePerSquareMean   = np.mean  ( closestPricePerSquare_s_0 )
+		pricePerSquareMax    = np.max   ( closestPricePerSquare_s_0 )
+		pricePerSquareMin    = np.min   ( closestPricePerSquare_s_0 )
 		
 		RESULT_PRICE_S['predictedPrice'] = int( predictedPrice.values[0]                                   ) 
 		RESULT_PRICE_S['medianPrice'   ] = int( pricePerSquareMedian*inputSquare ) 
@@ -172,11 +178,11 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 		ALPHA_FLOOR_NUMBER_S[ closestFloorNumber_s == 1                       ] = ALPHA_FLOOR_NUMBER[inputFloorStatus][0] 
 		ALPHA_FLOOR_NUMBER_S[ closestFloorNumber_s == closestNumberOfFloors_s ] = ALPHA_FLOOR_NUMBER[inputFloorStatus][2] 
 		
-		inputPricePerSquare     = inputPricePerSquare     * ALPHA_BARGAINING
-		closestPricePerSquare_s = closestPricePerSquare_s * ALPHA_BARGAINING 
-		closestPricePerSquare_s = closestPricePerSquare_s * ALPHA_FLOOR_NUMBER_S
+		inputPricePerSquare       = inputPricePerSquare       * ALPHA_BARGAINING
+		closestPricePerSquare_s_1 = closestPricePerSquare_s_0 * ALPHA_BARGAINING 
+		closestPricePerSquare_s_2 = closestPricePerSquare_s_1 * ALPHA_FLOOR_NUMBER_S
 		
-		deltaPricePerSquare_s = inputPricePerSquare - closestPricePerSquare_s
+		deltaPricePerSquare_s = inputPricePerSquare - closestPricePerSquare_s_2
 		
 		forward_index_s  = np.argsort( abs( deltaPricePerSquare_s ) )
 		backward_index_s = np.full( forward_index_s.shape, 0 ) 
@@ -197,10 +203,11 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 				FLT2INTError += fltDelta - intDelta
 			FLT2INTError_s[i] = FLT2INTError
 		minFLT2INTError_arg = np.argmin(FLT2INTError_s) 
-		resDeltaPricePerSquare_s = intDeltaPricePerSquare_s [ minFLT2INTError_arg ][ backward_index_s ]
-		AlphaApartmentCondition  = ALPHA_APARTMENT_CONDITION[ minFLT2INTError_arg ]
-
+		resDeltaPricePerSquare_s  = intDeltaPricePerSquare_s [ minFLT2INTError_arg ][ backward_index_s ]
+		closestPricePerSquare_s_3 = closestPricePerSquare_s_2 + resDeltaPricePerSquare_s
+		
 		if verboseFlag :
+			AlphaApartmentCondition  = ALPHA_APARTMENT_CONDITION[ minFLT2INTError_arg ]
 			#resflt2intError          = np.min(flt2intError_s) 
 			#print( "inputPricePerSquare    {:}".format(                                           ) )
 			print( "fltDeltaPricePerSquare  {:}".format( deltaPricePerSquare_s   .astype(np.int32) ) )
@@ -208,24 +215,24 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 			print( "intDeltaPricePerSquare  {:}".format( resDeltaPricePerSquare_s.astype(np.int32) ) )
 			#print( "resFLT2INTError         {:}".format( resflt2intError                           ) )
 		
-		ALPHA_APP_CONDITION_S = resDeltaPricePerSquare_s/closestPricePerSquare_s 
-		
 		RESULT_ALPHA_S = dict()
-		RESULT_ALPHA_S["closestObjectsPrice"         ] = closestPrice_s         
-		RESULT_ALPHA_S["closestObjectsSquare"        ] = closestSquare_s        
-		RESULT_ALPHA_S["closestObjectsPricePerSquare"] = closestPricePerSquare_s
+		RESULT_ALPHA_S["closestObjectsPrice"           ] = closestPrice_s         
+		RESULT_ALPHA_S["closestObjectsSquare"          ] = closestSquare_s        
+		RESULT_ALPHA_S["closestObjectsPricePerSquare_0"] = closestPricePerSquare_s_0
+		RESULT_ALPHA_S["closestObjectsPricePerSquare_1"] = closestPricePerSquare_s_1
+		RESULT_ALPHA_S["closestObjectsPricePerSquare_2"] = closestPricePerSquare_s_2
+		RESULT_ALPHA_S["closestObjectsPricePerSquare_3"] = closestPricePerSquare_s_3
 		
 		RESULT_ALPHA_S["BargainingCorrection"        ] = ALPHA_BARGAINING_S     
 		RESULT_ALPHA_S["FloorNumberCorrection"       ] = ALPHA_FLOOR_NUMBER_S   
 		
 		weightCoefficient_s      = np.full( len(closestItem_s), 1./len(closestItem_s) )
-		weightedPricePerSquare_s = closestPricePerSquare_s * weightCoefficient_s
+		weightedPricePerSquare_s = closestPricePerSquare_s_3 * weightCoefficient_s
 		RESULT_ALPHA_S["deltaApartmentConditionPricePerSquare"] = resDeltaPricePerSquare_s
 		RESULT_ALPHA_S["WeightCoefficient"                    ] = weightCoefficient_s     
 		RESULT_ALPHA_S["WeightedPricePerSquare"               ] = weightedPricePerSquare_s
 		
-		closestPricePerSquare_s += resDeltaPricePerSquare_s
-		resultPricePerSquare = np.mean(closestPricePerSquare_s)
+		resultPricePerSquare = np.mean(closestPricePerSquare_s_3)
 		RESULT_ALPHA_S["ResultPricePerSquare"] = resultPricePerSquare 
 		RESULT_ALPHA_S["ResultCondition"     ] = minFLT2INTError_arg 
 		RESULT_ALPHA_S["ResultPrice"         ] = resultPricePerSquare*inputSquare
@@ -335,21 +342,24 @@ if inputDataSize > 0: # Check that input data is correct
 		print( "Max       price: {:,}".format( RESULT_PRICE_S['maxPrice'      ] ) )
 		print( "Min       price: {:,}".format( RESULT_PRICE_S['minPrice'      ] ) )
 		
-		print( "Closest objects        price: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["closestObjectsPrice"         ].astype(np.int32  ).tolist()) ) )
-		print( "Closest objects       square: "+",".join(['{:9.1f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["closestObjectsSquare"        ].astype(np.float32).tolist()) ) )
-		print( "Closest objects price/square: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["closestObjectsPricePerSquare"].astype(np.int32  ).tolist()) ) )
+		print( "Closest objects          price: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["closestObjectsPrice"           ].astype(np.int32  ).tolist()) ) )
+		print( "Closest objects         square: "+",".join(['{:9.1f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["closestObjectsSquare"          ].astype(np.float32).tolist()) ) )
 		
-		print( "Bargaining       corrections: "+",".join(['{:9.2f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["BargainingCorrection"        ].tolist()) ) ) 
-		print( "Floor number     corrections: "+",".join(['{:9.2f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["FloorNumberCorrection"       ].tolist()) ) )
-		#print( "Apartment condition corrections: "+",".join(['{:9.2f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["ApartmentConditionCorrection"].tolist()) ) )
+		print( "Closest objects price/square 0: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["closestObjectsPricePerSquare_0"].astype(np.int32  ).tolist()) ) )
+		print( "Closest objects price/square 1: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["closestObjectsPricePerSquare_1"].astype(np.int32  ).tolist()) ) )
+		print( "Closest objects price/square 2: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["closestObjectsPricePerSquare_2"].astype(np.int32  ).tolist()) ) )
+		print( "Closest objects price/square 3: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["closestObjectsPricePerSquare_3"].astype(np.int32  ).tolist()) ) )
 		
-		print( "Delta           price/square: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["deltaApartmentConditionPricePerSquare"].astype(np.int32  ).tolist()) ) )
-		print( "Weigth          coefficients: "+",".join(['{:9.2f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["WeightCoefficient"                    ].astype(np.float32).tolist()) ) )
-		print( "Weighted        price/square: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["WeightedPricePerSquare"               ].astype(np.int32  ).tolist()) ) )
-		print( "Result             condition: {:9d}".format( int(RESULT_ALPHA_S["ResultCondition"])         ) )
-		print( "Result          price/square: {:9d}".format( int(RESULT_ALPHA_S["ResultPricePerSquare"])    ) )
-		print( "Result                 price: {:9d}".format( int(RESULT_ALPHA_S["ResultPrice"])             ) )
-		print( "Rounded result         price: {:9d}".format( int(RESULT_ALPHA_S["ResultPrice"]/10000)*10000 ) )
+		print( "Bargaining         corrections: "+",".join(['{:9.2f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["BargainingCorrection"        ].tolist()) ) ) 
+		print( "Floor number       corrections: "+",".join(['{:9.2f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["FloorNumberCorrection"       ].tolist()) ) )
+		
+		print( "Delta             price/square: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["deltaApartmentConditionPricePerSquare"].astype(np.int32  ).tolist()) ) )
+		print( "Weigth            coefficients: "+",".join(['{:9.2f}']*len(closestItem_s)).format( *(RESULT_ALPHA_S["WeightCoefficient"                    ].astype(np.float32).tolist()) ) )
+		print( "Weighted          price/square: "+",".join(['{:9d}'  ]*len(closestItem_s)).format( *(RESULT_ALPHA_S["WeightedPricePerSquare"               ].astype(np.int32  ).tolist()) ) )
+		print( "Result               condition: {:9d}".format( int(RESULT_ALPHA_S["ResultCondition"])         ) )
+		print( "Result            price/square: {:9d}".format( int(RESULT_ALPHA_S["ResultPricePerSquare"])    ) )
+		print( "Result                   price: {:9d}".format( int(RESULT_ALPHA_S["ResultPrice"])             ) )
+		print( "Rounded result           price: {:9d}".format( int(RESULT_ALPHA_S["ResultPrice"]/10000)*10000 ) )
 		
 		if verboseFlag :
 			print( closestItem_s[['price','total_square','exploitation_start_year','created_at','floor_number','number_of_floors']] )
