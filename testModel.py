@@ -49,7 +49,7 @@ parser.add_argument("--verbose"   , action="store_true"     )
 
 parser.add_argument("--analysis"  , action="store_true"     )
 
-def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTolerances, limitWithDate=False ) :
+def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTolerances, limitWithDate=True ) :
 	engine = create_engine( inputDataBase )
 	
 	inputTolerancesFields = set( inputTolerances.keys() )
@@ -76,7 +76,7 @@ def getClosestItemsInDatabase( inputSeries, inputDataBase, inputTable, inputTole
 	resultValues.drop_duplicates(subset=subset, keep='first', inplace=True)	
 	
 	return resultValues
-
+"""
 def getTopKClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE_NAMES, topk=5 ) :
 	if not closestItem_s.empty :
 		droppedField_s = ['total_square','living_square','kitchen_square']
@@ -96,6 +96,15 @@ def getTopKClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE
 		
 		index_s = processedResult_s_numpy.argsort()[:topk]
 		return closestItem_s.iloc[index_s]
+	else :
+		return closestItem_s
+"""
+def getTopKClosestItems( inputItem, closestItem_s, PREPROCESSOR_X, MODEL_FEATURE_NAMES, topk=5 ) :
+	if not closestItem_s.empty :
+		#closestItem_s.sort_values(by='created_at',ascending=False)
+		closestItem_s.sort_values(by='date_update',ascending=True)
+		
+		return closestItem_s.head(n=topk)
 	else :
 		return closestItem_s
 
@@ -167,6 +176,7 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 		
 		#Calculate required coeffecients
 		inputPrice = int( pricePerSquareMedian*inputItem[['total_square']].values[0]) 
+		#inputPrice = int( pricePerSquareMean*inputItem[['total_square']].values[0]) 
 		inputPricePerSquare  = inputPrice/inputSquare
 		
 		inputFloorStatus     = 1
@@ -202,7 +212,8 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 				intDeltaPricePerSquare_s[i][j] = intDelta
 				FLT2INTError += fltDelta - intDelta
 			FLT2INTError_s[i] = FLT2INTError
-		minFLT2INTError_arg = np.argmin(FLT2INTError_s) 
+		#minFLT2INTError_arg = np.argmin(FLT2INTError_s) 
+		minFLT2INTError_arg = 1 
 		resDeltaPricePerSquare_s  = intDeltaPricePerSquare_s [ minFLT2INTError_arg ][ backward_index_s ]
 		closestPricePerSquare_s_3 = closestPricePerSquare_s_2 + resDeltaPricePerSquare_s
 		
@@ -213,7 +224,7 @@ def processClosestItems( inputItem, closestItem_s, predictedPrice, verboseFlag=F
 			print( "fltDeltaPricePerSquare  {:}".format( deltaPricePerSquare_s   .astype(np.int32) ) )
 			print( "alphaApartmentCondition {:}".format( AlphaApartmentCondition                   ) )
 			print( "intDeltaPricePerSquare  {:}".format( resDeltaPricePerSquare_s.astype(np.int32) ) )
-			#print( "resFLT2INTError         {:}".format( resflt2intError                           ) )
+			print( "FLT2INTError_s          {:}".format( FLT2INTError_s                            ) )
 		
 		RESULT_ALPHA_S = dict()
 		RESULT_ALPHA_S["closestObjectsPrice"           ] = closestPrice_s         
@@ -362,6 +373,6 @@ if inputDataSize > 0: # Check that input data is correct
 		print( "Rounded result           price: {:9d}".format( int(RESULT_ALPHA_S["ResultPrice"]/10000)*10000 ) )
 		
 		if verboseFlag :
-			print( closestItem_s[['price','total_square','exploitation_start_year','created_at','floor_number','number_of_floors']] )
+			print( closestItem_s[['price','total_square','exploitation_start_year','created_at','date_update','floor_number','number_of_floors']] )
 		else :
 			print( closestItem_s[['re_id']].to_json( orient='records') )
