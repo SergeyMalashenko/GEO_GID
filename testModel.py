@@ -40,11 +40,11 @@ parser.add_argument("--query"     , type=str                )
 parser.add_argument("--limits"    , type=str  , default=""  )
 
 parser.add_argument("--tolerances", type=str  , default=""  )
-parser.add_argument("--database"  , type=str  , default=""  )
-parser.add_argument("--table"     , type=str  , default=""  )
+#parser.add_argument("--database"  , type=str  , default=""  )
+#parser.add_argument("--table"     , type=str  , default=""  )
 
-parser.add_argument("--alpha"     , type=float, default=1.0 )
-parser.add_argument("--topk"      , type=int  , default=5   )
+#parser.add_argument("--alpha"     , type=float, default=1.0 )
+#parser.add_argument("--topk"      , type=int  , default=5   )
 parser.add_argument("--verbose"   , action="store_true"     )
 
 parser.add_argument("--analysis"  , action="store_true"     )
@@ -97,12 +97,12 @@ modelFileName   = args.model
 
 limitsFileName  = args.limits
 
-inputDatabase   = args.database
-inputTable      = args.table
+#inputDatabase   = args.database
+#inputTable      = args.table
 inputTolerances = dict() if args.tolerances == "" else eval( "dict({})".format( args.tolerances ) ) 
 
-alphaParam      = args.alpha
-topkParam       = args.topk
+#alphaParam      = args.alpha
+#topkParam       = args.topk
 verboseFlag     = args.verbose
 
 #Load tne model
