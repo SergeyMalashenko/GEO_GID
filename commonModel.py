@@ -101,7 +101,6 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 	#if 'id' in dataFrame.columns : dataFrame.drop(labels=['id',], axis=1, inplace=True )	
 	
 	return dataFrame
-
 # Neural network models	
 class LinearNet(torch.nn.Module):
 	def __init__(self, in_size ):
@@ -127,6 +126,85 @@ class LinearNet(torch.nn.Module):
 		x3 = self.fc3(x2).squeeze()
 		x3.backward()
 		return x0.grad
+"""
+# Neural network models	
+class ImprovedLinearNet(torch.nn.Module):
+    def __init__(self, in_size ):
+        super( ImprovedLinearNet, self).__init__()
+        self.in_size = in_size
+        
+        self.lft_fc1 = torch.nn.Linear(   2, 300); torch.nn.init.xavier_uniform_( self.lft_fc1.weight );
+        self.lft_fc2 = torch.nn.Linear( 300, 300); torch.nn.init.xavier_uniform_( self.lft_fc2.weight );
+        self.lft_fc3 = torch.nn.Linear( 300,   1); torch.nn.init.xavier_uniform_( self.lft_fc3.weight );
+
+        self.lft_bn1 = torch.nn.BatchNorm1d(300)
+        self.lft_bn2 = torch.nn.BatchNorm1d(300)
+        
+        self.rht_fc1 = torch.nn.Linear(   3, 300); torch.nn.init.xavier_uniform_( self.rht_fc1.weight );
+        self.rht_fc2 = torch.nn.Linear( 300, 300); torch.nn.init.xavier_uniform_( self.rht_fc2.weight );
+        self.rht_fc3 = torch.nn.Linear( 300, 1  ); torch.nn.init.xavier_uniform_( self.rht_fc3.weight );
+        
+        self.rht_bn1 = torch.nn.BatchNorm1d(300)
+        self.rht_bn2 = torch.nn.BatchNorm1d(300)
+    
+    def forward(self, x0):
+        #['price,total_square,longitude,latitude,number_of_rooms,number_of_floors,exploitation_start_year']
+        #total_square            = x0[:, 0:1 ]
+        #longitude_latitude      = x0[:,[1,2]]
+        #number_of_rooms         = x0[:, 3:4 ]
+        #number_of_floors        = x0[:, 4:5 ]
+        #exploitation_start_year = x0[:, 5:6 ]
+        
+        #total_square, longitude_latitude, number_of_rooms, number_of_floors, exploitation_start_year = torch.split( x0, [1,2,1,1,1], dim=1)
+        #lft_x0 = longitude_latitude
+        #rht_x0 = exploitation_start_year
+        total_square, lft_x0, rht_x0 = torch.split(x0, [1,2,3], dim=1 )
+	
+        lft_x1 = torch.nn.functional.relu( self.lft_bn1( self.lft_fc1(lft_x0) ) )
+        lft_x2 = torch.nn.functional.relu( self.lft_bn2( self.lft_fc2(lft_x1) ) )
+        lft_x3 = self.lft_fc3(lft_x2)
+        
+        rht_x1 = torch.nn.functional.relu( self.rht_bn1( self.rht_fc1(rht_x0) ) )
+        rht_x2 = torch.nn.functional.relu( self.rht_bn2( self.rht_fc2(rht_x1) ) )
+        rht_x3 = self.rht_fc3(rht_x2)
+        
+        x3 = total_square*lft_x3*rht_x3
+        return x3
+"""
+# Neural network models	
+class ImprovedLinearNet(torch.nn.Module):
+    def __init__(self, in_size ):
+        super( ImprovedLinearNet, self).__init__()
+        self.in_size = in_size
+        
+        self.lft_fc1 = torch.nn.Linear(   5, 200); torch.nn.init.xavier_uniform_( self.lft_fc1.weight );
+        self.lft_fc2 = torch.nn.Linear( 200, 200); torch.nn.init.xavier_uniform_( self.lft_fc2.weight );
+        self.lft_fc3 = torch.nn.Linear( 200,   1); torch.nn.init.xavier_uniform_( self.lft_fc3.weight );
+
+        self.lft_bn1 = torch.nn.BatchNorm1d(200)
+        self.lft_bn2 = torch.nn.BatchNorm1d(200)
+        
+    def forward(self, x0):
+        #['price,total_square,longitude,latitude,number_of_rooms,number_of_floors,exploitation_start_year']
+        #total_square            = x0[:, 0:1 ]
+        #longitude_latitude      = x0[:,[1,2]]
+        #number_of_rooms         = x0[:, 3:4 ]
+        #number_of_floors        = x0[:, 4:5 ]
+        #exploitation_start_year = x0[:, 5:6 ]
+        
+        #total_square, longitude_latitude, number_of_rooms, number_of_floors, exploitation_start_year = torch.split( x0, [1,2,1,1,1], dim=1)
+        #lft_x0 = longitude_latitude
+        #rht_x0 = exploitation_start_year
+        total_square, lft_x0 = torch.split(x0, [1,5], dim=1 )
+	
+        lft_x1 = torch.nn.functional.relu( self.lft_bn1( self.lft_fc1(lft_x0) ) )
+        lft_x2 = torch.nn.functional.relu( self.lft_bn2( self.lft_fc2(lft_x1) ) )
+        lft_x3 = self.lft_fc3(lft_x2)
+        
+        x3 = total_square*lft_x3
+        return x3
+
+
 
 def limitDataUsingProcentiles( dataFrame ):
 	if 'price' in dataFrame.columns :
@@ -156,8 +234,7 @@ class loadDataFrame(object) : # NUMERICAL, OBJECT, ALL
 		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
 	def __call__(self, dataBase, tableName, COLUMN_TYPE='NUMERICAL' ):
 		engine = create_engine( dataBase )
-		dataFrame = pd.read_sql('SELECT price,longitude,latitude,total_square,kitchen_square,living_square,number_of_rooms,floor_number,number_of_floors,exploitation_start_year,distance_to_metro FROM smartRealtor.real_estate_from_ads_api;', engine )
-		#dataFrame = pd.read_sql_table( tableName, engine)
+		dataFrame = pd.read_sql_table( tableName, engine)
 		return self.__processDataFrame( dataFrame, COLUMN_TYPE )
 	def __processDataFrame(self, dataFrame, COLUMN_TYPE ):
 		if 'price' in dataFrame.columns : dataFrame = dataFrame[ dataFrame['price'].apply( check_float ) ]
