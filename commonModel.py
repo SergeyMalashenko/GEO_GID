@@ -51,7 +51,7 @@ class HuberRegressionLoss( torch.nn.Module ):
 		eps   = self.eps
 		
 		e = ( target - predict )
-		
+    	
 		result = torch.zeros( e.size() )
 		
 		mask = torch.abs( e ).le( delta )
@@ -101,19 +101,19 @@ def limitDataUsingLimitsFromFilename( dataFrame, limitsFileName ) :
 	#if 'id' in dataFrame.columns : dataFrame.drop(labels=['id',], axis=1, inplace=True )	
 	
 	return dataFrame
-# Neural network models	
+# Neural network models
 class LinearNet(torch.nn.Module):
 	def __init__(self, in_size ):
 		super( LinearNet, self).__init__()
 		
 		self.in_size = in_size
 		
-		self.fc1 = torch.nn.Linear( in_size, 200); torch.nn.init.xavier_uniform_( self.fc1.weight );
-		self.fc2 = torch.nn.Linear(200, 200);      torch.nn.init.xavier_uniform_( self.fc2.weight );
-		self.fc3 = torch.nn.Linear(200,   1);      torch.nn.init.xavier_uniform_( self.fc3.weight );
+		self.fc1 = torch.nn.Linear( in_size, 300); torch.nn.init.xavier_uniform_( self.fc1.weight );
+		self.fc2 = torch.nn.Linear(300, 300);      torch.nn.init.xavier_uniform_( self.fc2.weight );
+		self.fc3 = torch.nn.Linear(300,   1);      torch.nn.init.xavier_uniform_( self.fc3.weight );
 
-		self.bn1 = torch.nn.BatchNorm1d(200)
-		self.bn2 = torch.nn.BatchNorm1d(200)
+		self.bn1 = torch.nn.BatchNorm1d(300)
+		self.bn2 = torch.nn.BatchNorm1d(300)
 	def forward(self, x0):
 		x1 = torch.nn.functional.relu( self.bn1( self.fc1(x0) ) )
 		x2 = torch.nn.functional.relu( self.bn2( self.fc2(x1) ) )
@@ -126,6 +126,28 @@ class LinearNet(torch.nn.Module):
 		x3 = self.fc3(x2).squeeze()
 		x3.backward()
 		return x0.grad
+"""
+class LinearNet(torch.nn.Module):
+	def __init__(self, in_size ):
+		super( LinearNet, self).__init__()
+		
+		self.in_size = in_size
+		
+		self.fc1 = torch.nn.Linear( in_size, 1024); torch.nn.init.xavier_uniform_( self.fc1.weight );
+		self.fc2 = torch.nn.Linear(     1024,   1); torch.nn.init.xavier_uniform_( self.fc2.weight );
+
+		self.bn1 = torch.nn.BatchNorm1d(1024)
+	def forward(self, x0):
+		x1 = torch.nn.functional.relu( self.bn1( self.fc1(x0) ) )
+		x2 = self.fc2(x1)
+		return x2
+	def jacobian( self, x ):
+		x0 = torch.tensor( x, requires_grad=True)
+		x1 = torch.nn.functional.relu( self.bn1( self.fc1(x0) ) )
+		x2 = self.fc2(x1).squeeze()
+		x2.backward()
+		return x0.grad
+"""
 """
 # Neural network models	
 class ImprovedLinearNet(torch.nn.Module):

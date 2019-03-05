@@ -255,7 +255,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, featureNames, seed=43 ):
     X_torchTest_s = torch.split( X_torchTest, batch_size, dim=0 )
     Y_torchTest_s = torch.split( Y_torchTest, batch_size, dim=0 )
     	
-    for t in range(5000):
+    for t in range(6000):
         model.train()
         X_numpyTrain, X_numpyVal, Y_numpyTrain, Y_numpyVal = train_test_split( X_numpyTrainVal, Y_numpyTrainVal, test_size=0.25 )
 	
@@ -286,7 +286,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, featureNames, seed=43 ):
             y = Y_torchTrain_s[i]
             
             y_pred = model(x)
-            loss   = loss_fn(y_pred, y)
+            loss   = loss_fn( (y_pred - y)/y , torch.zeros( y.shape ) )
             		
             model.zero_grad()
             loss.backward  ()
@@ -306,7 +306,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, featureNames, seed=43 ):
             Y_torchPredict_s[i].copy_( y_pred )
             ValLoss += loss_fn( y_pred, y )
         ValLoss /= (len(Y_torchPredict_s)-1) 
-        Y_numpyPredict = Y_torchPredict.detach().numpy()
+        Y_numpyPredict = Y_torchPredict.cpu().detach().numpy()
         
         threshold = 0.1; eps = 0.001
         ValTrue_s   = np.sum( np.abs( (Y_numpyPredict - Y_numpyVal)/( Y_numpyVal + eps ) ) <= threshold )
@@ -327,7 +327,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, featureNames, seed=43 ):
                 Y_torchPredict_s[i].copy_( y_pred )
                 TestLoss += loss_fn( y_pred, y )
             TestLoss /= (len(Y_torchPredict_s)-1) 
-            Y_numpyPredict = Y_torchPredict.detach().numpy()
+            Y_numpyPredict = Y_torchPredict.cpu().detach().numpy()
             
             threshold = 0.1; eps = 0.001
             TestTrue_s   = np.sum( np.abs( (Y_numpyPredict - Y_numpyTest)/( Y_numpyTest + eps ) ) <= threshold )
@@ -345,8 +345,8 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, featureNames, seed=43 ):
     X_torchTotal = torch.from_numpy( X_numpyTotal.astype( np.float32 ) ).to( device )
     Y_torchTotal = torch.from_numpy( Y_numpyTotal.astype( np.float32 ) ).to( device )
     Y_torchPredict = model( X_torchTotal )
-    Y_numpyPredict = Y_torchPredict.detach().numpy()
-    Y_numpyTotal   = Y_torchTotal  .detach().numpy()
+    Y_numpyPredict = Y_torchPredict.cpu().detach().numpy()
+    Y_numpyTotal   = Y_torchTotal  .cpu().detach().numpy()
     
     eps = 0.001
     Y_relErr = np.abs( Y_numpyPredict - Y_numpyTotal )/( Y_numpyTotal + eps )

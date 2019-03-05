@@ -15,7 +15,8 @@
 	"latitude"        : 
 		{ "min" : 55.14 , "max" : 56.05     },
 	"longitude"       : 
-		{ "min" : 36.80 , "max" : 37.92     }  
-
+		{ "min" : 36.80 , "max" : 37.92     },  
+	"exploitation_start_year" :
+		{ "min" : 1855  , "max" : 2014 }
 }
 
