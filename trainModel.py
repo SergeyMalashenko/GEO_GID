@@ -242,7 +242,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, featureNames, seed=43 ):
     #loss_fn       = torch.nn.MSELoss  ( size_average=False)
     loss_fn       = torch.nn.L1Loss  ( )
     #optimizer     = torch.optim.SGD   ( model.parameters(), lr=learning_rate, momentum=0.9)
-    optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate, amsgrad=True )
+    optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate, amsgrad=True, weight_decay=0.001 )
     scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=500, gamma=0.5)
     
     batch_size           = 256

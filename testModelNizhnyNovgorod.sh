@@ -25,11 +25,11 @@ set -x
 
 ./testModel.py --model $MODELNAME_ --query 'longitude=44.002034, latitude=56.311701, total_square=91.1, living_square=45.1, kitchen_square=20.5, number_of_rooms=2, floor_number=2, number_of_floors=9, exploitation_start_year=2003' --limits input/NizhnyNovgorodLimits.json
 
-./testModel.py --model $MODELNAME_ --limits input/NizhnyNovgorodLimits.json --query 'longitude=44.0151902, latitude=56.2638371, total_square=59.3, living_square=40, kitchen_square=5, number_of_rooms=3, floor_number=4, number_of_floors=17, exploitation_start_year=2015' $MODE_
+./testModel.py --model $MODELNAME_ --limits input/NizhnyNovgorodLimits.json --query 'longitude=44.0151902, latitude=56.2638371, total_square=59.3, living_square=40, kitchen_square=5, number_of_rooms=3, floor_number=4, number_of_floors=17, exploitation_start_year=2015'
 
-./testModel.py --model $MODELNAME_ --limits input/NizhnyNovgorodLimits.json --query 'longitude=43.9620856, latitude=56.3315441, total_square=49.1, living_square=35, kitchen_square=10, number_of_rooms=2, floor_number=7, number_of_floors=9, exploitation_start_year=1975' $MODE_
+./testModel.py --model $MODELNAME_ --limits input/NizhnyNovgorodLimits.json --query 'longitude=43.9620856, latitude=56.3315441, total_square=49.1, living_square=35, kitchen_square=10, number_of_rooms=2, floor_number=7, number_of_floors=9, exploitation_start_year=1975'
 
 #https://www.gipernn.ru/prodazha-kvartir/3-komnatnaya-ul-belinskogo-d-15-id2561887
-./testModel.py --model $MODELNAME_ --limits input/NizhnyNovgorodLimits.json --query 'longitude=43.9989883, latitude=56.310686, total_square=104.6, living_square=60.8, kitchen_square=15.1, number_of_rooms=3, floor_number=3, number_of_floors=14, exploitation_start_year=2010' $MODE_
+./testModel.py --model $MODELNAME_ --limits input/NizhnyNovgorodLimits.json --query 'longitude=43.9989883, latitude=56.310686, total_square=104.6, living_square=60.8, kitchen_square=15.1, number_of_rooms=3, floor_number=3, number_of_floors=14, exploitation_start_year=2010'
 
 set +x
