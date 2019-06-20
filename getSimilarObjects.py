@@ -25,8 +25,9 @@ from commonModel import limitDataUsingProcentiles
 
 from commonModel import LinearNet
 
+import datetime
 
-def getClosestItemsInDatabase( inputQuery, inputDataBase, inputTable, inputDeltas):
+def getClosestItemsInDatabase( inputQuery, inputDataBase, inputTable, inputDeltas, limitPublicationDate=30 ):
     engine = create_engine(inputDataBase)
     
     inputDeltasFields = set( inputDeltas.index ) 
@@ -45,8 +46,14 @@ def getClosestItemsInDatabase( inputQuery, inputDataBase, inputTable, inputDelta
         "{1} <= {0} AND {0} <= {2}".format(
             field, min_value, max_value) for (
             field, (min_value, max_value)) in processedLimits.items())
+    currentDate  = datetime.date.today()
+    
+    deltaDate    = datetime.timedelta(days=limitPublicationDate)
+    updatedDate  = currentDate - deltaDate
+    sql_query += """ AND """ + """publication_date BETWEEN '{}' AND '{}'  """.format( updatedDate, currentDate )
+    
     resultValues = pd.read_sql_query(sql_query, engine)
-    subset = ['longitude','latitude','total_square','number_of_rooms','number_of_floors']
+    subset = ['longitude','latitude','total_square','number_of_rooms','number_of_floors','floor_number']
     resultValues.drop_duplicates(subset=subset, keep='first', inplace=True)
     
     return resultValues
@@ -79,10 +86,10 @@ parser.add_argument("--query", type=str)
 parser.add_argument("--database", type=str)
 parser.add_argument("--table", type=str)
 
-parser.add_argument("--scales", type=str)
-parser.add_argument("--deltas", type=str)
+parser.add_argument("--scales"    , type=str)
+parser.add_argument("--deltas"    , type=str)
 
-parser.add_argument("--output_features", type=str, default='longitude,latitude,total_square,number_of_floors,number_of_rooms,exploitation_start_year')
+parser.add_argument("--output_features", type=str, default='longitude,latitude,total_square,number_of_floors,number_of_rooms,exploitation_start_year,publication_date')
 parser.add_argument("--output_format", type=str, default='json')
 parser.add_argument("--output_topk", type=int, default=5)
 parser.add_argument("--verbose", action="store_true")
@@ -112,7 +119,11 @@ closestItem_s = getTopKClosestItems      ( userQuery, closestItem_s, userScales,
 closestItem_s = closestItem_s[ outputFeatures ]
 
 if outputFormat == 'json' :
+    def json_serial(obj):
+        if isinstance(obj, (datetime.datetime,datetime.date )):
+            return obj.isoformat()
+        raise TypeError ("Type %s not serializable" % type(obj))
     json_output = closestItem_s.to_dict( orient='records' )
-    print( json.dumps( json_output, sort_keys=True, indent=4, separators=(',', ': ')) )
+    print( json.dumps( json_output, default=json_serial, sort_keys=True, indent=4, separators=(',', ': ')) )
 else :
     pass
