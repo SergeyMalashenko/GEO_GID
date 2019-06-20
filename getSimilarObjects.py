@@ -29,8 +29,8 @@ from commonModel import LinearNet
 def getClosestItemsInDatabase( inputQuery, inputDataBase, inputTable, inputDeltas):
     engine = create_engine(inputDataBase)
     
-    inputDeltasFields = set( inputDeltas.keys() ) #dictionary
-    inputQueryFields  = set( inputQuery.index  )
+    inputDeltasFields = set( inputDeltas.index ) 
+    inputQueryFields  = set( inputQuery .index )
     
     processedDeltas = {field: inputDeltas[field] for field in inputDeltasFields.intersection(inputQueryFields)}
     
@@ -58,11 +58,11 @@ def getTopKClosestItems( inputItem, closestItem_s, inputScales, inputTopK=5):
         processedInputItem     = inputItem    [ inputScalesFields ]
         processedClosestItem_s = closestItem_s[ inputScalesFields ]
         
-        inputScales_numpy            = inputScales           .values()
+        inputScales_numpy            = inputScales           .values
         processedInputItem_numpy     = processedInputItem    .values
         processedClosestItem_s_numpy = processedClosestItem_s.values
         processedInputItem_numpy     = processedInputItem_numpy.reshape(1, -1)
-
+        
         processedResult_s_numpy = (processedClosestItem_s_numpy - processedInputItem_numpy)*inputScales_numpy
         processedResult_s_numpy = np.linalg.norm( processedResult_s_numpy, axis=1)
 
@@ -102,11 +102,12 @@ outputFeatures = args.output_features.split(",")
 outputFormat   = args.output_format
 outputTopK     = args.output_topk
 
+userQuery  = pd.Series( data=userQuery  )
+userScales = pd.Series( data=userScales )
+userDeltas = pd.Series( data=userDeltas )
 
-userDataFrame = pd.Series( data=userQuery )
-
-closestItem_s = getClosestItemsInDatabase( userDataFrame, databaseName , tableName , userDeltas)
-closestItem_s = getTopKClosestItems      ( userDataFrame, closestItem_s, userScales, outputTopK)
+closestItem_s = getClosestItemsInDatabase( userQuery, databaseName , tableName , userDeltas)
+closestItem_s = getTopKClosestItems      ( userQuery, closestItem_s, userScales, outputTopK)
 
 closestItem_s = closestItem_s[ outputFeatures ]
 
