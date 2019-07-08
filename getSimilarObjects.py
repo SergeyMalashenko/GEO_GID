@@ -27,9 +27,7 @@ from commonModel import LinearNet
 
 import datetime
 
-def getClosestItemsInDatabase( inputQuery, inputDataBase, inputTable, inputDeltas, limitPublicationDate=30 ):
-    engine = create_engine(inputDataBase)
-    
+def getClosestItemsInDatabase( engine, inputQuery, inputDataBase, inputTable, inputDeltas, limitPublicationDate=30 ):
     inputDeltasFields = set( inputDeltas.index ) 
     inputQueryFields  = set( inputQuery .index )
     
@@ -78,52 +76,62 @@ def getTopKClosestItems( inputItem, closestItem_s, inputScales, inputTopK=5):
     else:
         return closestItem_s
 
+def getSimilarObjectsMain( engine, tableName, userQuery, userScales, userDeltas, outputTopK, outputFeatures ): 
+    userQuery  = pd.Series( data=userQuery  )
+    userScales = pd.Series( data=userScales )
+    userDeltas = pd.Series( data=userDeltas )
+    
+    closestItem_s = getClosestItemsInDatabase( engine, userQuery, databaseName , tableName , userDeltas)
+    closestItem_s = getTopKClosestItems      (         userQuery, closestItem_s, userScales, outputTopK)
+    
+    closestItem_s = closestItem_s[ outputFeatures ]
+    
+    return closestItem_s  
 
-parser = argparse.ArgumentParser()
+def parseArguments() :
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument("--query"   , type=str)
+    parser.add_argument("--database", type=str)
+    parser.add_argument("--table"   , type=str)
+    parser.add_argument("--scales"  , type=str)
+    parser.add_argument("--deltas"  , type=str)
+    
+    parser.add_argument("--output_features", type=str, default='id,longitude,latitude,total_square,number_of_floors,number_of_rooms,exploitation_start_year,publication_date')
+    parser.add_argument("--output_format"  , type=str, default='json')
+    parser.add_argument("--output_topk"    , type=int, default=5)
+    parser.add_argument("--verbose", action="store_true")
+    
+    args = parser.parse_args()
 
-parser.add_argument("--query", type=str)
+    userQuery  = eval("dict({})".format(args.query ))
+    userScales = eval("dict({})".format(args.scales))
+    userDeltas = eval("dict({})".format(args.deltas))
+    
+    databaseName = args.database
+    tableName    = args.table
+    
+    outputFeatures = args.output_features.split(",")
+    outputFormat   = args.output_format
+    outputTopK     = args.output_topk
+    
+    verboseFlag = args.verbose
+    
+    return databaseName, tableName, userQuery, userScales, userDeltas, outputFeatures, outputFormat, outputTopK
 
-parser.add_argument("--database", type=str)
-parser.add_argument("--table", type=str)
+if __name__ == "__main__":
+    databaseName, tableName, userQuery, userScales, userDeltas, outputFeatures, outputFormat, outputTopK = parseArguments()
+    
+    engine        = create_engine( databaseName )
+    closestItem_s = getSimilarObjectsMain( engine, tableName, userQuery, userScales, userDeltas, outputTopK, outputFeatures )
 
-parser.add_argument("--scales"    , type=str)
-parser.add_argument("--deltas"    , type=str)
+    if outputFormat == 'json' :
+        def json_serial(obj):
+            if isinstance(obj, (datetime.datetime,datetime.date )):
+                return obj.isoformat()
+            raise TypeError ("Type %s not serializable" % type(obj))
+        json_output = closestItem_s.to_dict( orient='records' )
+        print( json.dumps( json_output, default=json_serial, sort_keys=True, indent=4, separators=(',', ': ')) )
+    else :
+        print( closestItem_s )
 
-parser.add_argument("--output_features", type=str, default='longitude,latitude,total_square,number_of_floors,number_of_rooms,exploitation_start_year,publication_date')
-parser.add_argument("--output_format", type=str, default='json')
-parser.add_argument("--output_topk", type=int, default=5)
-parser.add_argument("--verbose", action="store_true")
-
-args = parser.parse_args()
-
-userQuery  = eval("dict({})".format(args.query ))
-userScales = eval("dict({})".format(args.scales))
-userDeltas = eval("dict({})".format(args.deltas))
-
-databaseName = args.database
-tableName    = args.table
-
-verboseFlag = args.verbose
-
-outputFeatures = args.output_features.split(",")
-outputFormat   = args.output_format
-outputTopK     = args.output_topk
-
-userQuery  = pd.Series( data=userQuery  )
-userScales = pd.Series( data=userScales )
-userDeltas = pd.Series( data=userDeltas )
-
-closestItem_s = getClosestItemsInDatabase( userQuery, databaseName , tableName , userDeltas)
-closestItem_s = getTopKClosestItems      ( userQuery, closestItem_s, userScales, outputTopK)
-
-closestItem_s = closestItem_s[ outputFeatures ]
-
-if outputFormat == 'json' :
-    def json_serial(obj):
-        if isinstance(obj, (datetime.datetime,datetime.date )):
-            return obj.isoformat()
-        raise TypeError ("Type %s not serializable" % type(obj))
-    json_output = closestItem_s.to_dict( orient='records' )
-    print( json.dumps( json_output, default=json_serial, sort_keys=True, indent=4, separators=(',', ': ')) )
-else :
-    pass
