@@ -45,12 +45,10 @@ def getSimilarObjectsRequest():
     tableName      = request.args.get('tableName')
     userQuery      = request.args.get('userQuery' )
     userScales     = request.args.get('userScales')
-    userScales     = request.args.get('userDeltas')
+    userDeltas     = request.args.get('userDeltas')
     outputTopK     = request.args.get('outputTopK')
     outputFeatures = request.args.get('outputFeatures')
     
-    
-
     closestItem_s = getSimilarObjectsMain( engine, tableName, userQuery, userScales, userDeltas, outputTopK, outputFeatures )
     json_output = closestItem_s.to_dict( orient='records' )
     resp = Response( json.dumps( json_output, default=json_serial, sort_keys=True, indent=4, separators=(',', ': ')) )

@@ -6,6 +6,8 @@ import numpy             as np
 from sqlalchemy import create_engine
 from datetime   import datetime
 
+from tqdm       import tqdm
+
 import argparse
 
 from commonModel import limitDataUsingLimitsFromFilename, loadDataFrame
@@ -16,32 +18,40 @@ from sklearn.neighbors     import DistanceMetric
 from sklearn.preprocessing import MinMaxScaler
 
 parser = argparse.ArgumentParser()
-#parser.add_argument("--database", type=str, default="mysql://sr:A4y8J6r4@149.154.71.73:3310/sr_dev" )
-#parser.add_argument("--database", type=str, default="mysql://sr:password@portal.smartrealtor.pro:3306/smartrealtor" )
-#parser.add_argument("--database", type=str, default="mysql://root:Intemp200784@127.0.0.1/smartRealtor" )
-parser.add_argument("--database", type=str, default="mysql://root:Intemp200784@127.0.0.1/smartRealtor?unix_socket=/var/run/mysqld/mysqld.sock" )
+parser.add_argument("--database", type=str, default="mysql://root:UWmnjxPdN5ywjEcN@188.120.245.195:3306/domprice_dev1_v2" )
 parser.add_argument("--table"   , type=str, default="real_estate_from_ads_api" )
-
 #parser.add_argument("--limits"  , type=str, default="input/NizhnyNovgorodLimits.json" )
-parser.add_argument("--limits"  , type=str, default="input/MoscowLimits.json" )
-parser.add_argument("--debug"   , type=bool,default=False)
+parser.add_argument("--limits"  , type=str, default="input/KazanLimits.json" )
+parser.add_argument("--verbose" , type=bool,default=False)
 
 args   = parser.parse_args()
 
-databaseName = args.database
-tableName    = args.table
-limitsName   = args.limits
-debugFlag    = args.debug
+inputDatabase = args.database
+inputTable    = args.table
 
-outputTable  = "moscow_processed_data"
+limitsName    = args.limits
+verboseFlag   = args.verbose
+
+outputDatabase = "mysql://root:Intemp200784@127.0.0.1/smartRealtor?unix_socket=/var/run/mysqld/mysqld.sock" 
+#outputTable    = "nizhny_novgorod_processed_data"
+outputTable    = "kazan_processed_data"
 
 inputDataFrame = None
-inputDataFrame = loadDataFrame()( databaseName, tableName )
+inputDataFrame = loadDataFrame()( inputDatabase, inputTable, ['number','datetime'] )
 
+print( inputDataFrame[DATE_COLUMNS].describe() )
 inputDataFrame = limitDataUsingLimitsFromFilename( inputDataFrame, limitsName )
-inputDataFrame = inputDataFrame.select_dtypes(include=['number'])
 
-features = ['longitude','latitude','exploitation_start_year']
+print( inputDataFrame.describe() )
+
+#Drop duplicates
+subset = ['price','total_square','number_of_rooms', 'floor_number', 'number_of_floors', 'longitude','latitude' ]
+inputDataFrame.sort_values('created_at', inplace=True )
+inputDataFrame.drop_duplicates(subset=subset, keep='last', inplace=True)
+
+print( inputDataFrame.describe() )
+
+features = ['longitude','latitude','number_of_floors','number_of_rooms','exploitation_start_year']
 inputDataFeatures = inputDataFrame[ features ].values
 scaler = MinMaxScaler(copy=True, feature_range=(0, 1))
 inputDataFeatures = scaler.fit_transform(inputDataFeatures)
@@ -56,21 +66,31 @@ totalMeanPrice_s            = np.zeros( totalSize )
 
 outputDataFrame = inputDataFrame.copy()
 
-if debugFlag :
+print( "Before->" )
+print( outputDataFrame[ FLOAT_COLUMNS+INT_COLUMNS ].describe() )
+
+distance_limit = 0.005;
+
+if verboseFlag :
     for index in np.random.choice( inputDataFeatures.shape[0], 10 ):
         inputData = inputDataFeatures[index+0:index+1] 
         
         currentPrice                 = inputDataFrame['price'                  ].values[index]
         currentTotalSquare           = inputDataFrame['total_square'           ].values[index]
         currentKitchenSquare         = inputDataFrame['kitchen_square'         ].values[index]
+        currentNumberOfFloors        = inputDataFrame['number_of_floors'       ].values[index]
         currentNumberOfRooms         = inputDataFrame['number_of_rooms'        ].values[index]
         currentExploitationStartYear = inputDataFrame['exploitation_start_year'].values[index]
         
-        distance_s, index_s = searchTree.query( inputData, k=7 )
+        index_s, distance_s = searchTree.query_radius( inputData, distance_limit, count_only=False, return_distance=True )
+        index_s    = index_s   [0].astype(np.int32  )
+        distance_s = distance_s[0].astype(np.float32)
+        #distance_s, index_s = searchTree.query( inputData, k=5 )
         #distance_s, index_s = searchTree.query( inputData, r=0.05, k=5 )
         
         Price_s                 = inputDataFrame['price'                  ].values[index_s] 
         totalSquare_s           = inputDataFrame['total_square'           ].values[index_s] 
+        numberOfRooms           = inputDataFrame['number_of_floors'       ].values[index_s]
         numberOfRooms_s         = inputDataFrame['number_of_rooms'        ].values[index_s] 
         exploitationStartYear_s = inputDataFrame['exploitation_start_year'].values[index_s] 
         
@@ -78,9 +98,9 @@ if debugFlag :
         print( "-> currentTotalSquare           {:9.2f}".format( currentTotalSquare          ) )
         print( "-> currentExploitationStartYear {:9.2f}".format( currentExploitationStartYear) )
         
-        mask = distance_s < 0.03;
+        mask = distance_s < distance_limit;
         
-        if np.sum( mask ) >= 3:
+        if np.sum( mask ) >= 5:
             totalPricePerSquare_s = Price_s / totalSquare_s
             
             totalMedianPricePerSquare = np.median( totalPricePerSquare_s )
@@ -92,29 +112,35 @@ if debugFlag :
             totalMedianPrice_s         [ index ] = totalMedianPricePerSquare*currentTotalSquare 
             totalMeanPrice_s           [ index ] = totalMeanPricePerSquare  *currentTotalSquare
             
-
-
+            print( "-> currentMedianPrice        {:9.2f}".format( totalMedianPricePerSquare*currentTotalSquare ) )
+            print( "-> currentMeanPrice          {:9.2f}".format( totalMeanPricePerSquare  *currentTotalSquare ) )
+        print("")
 else :
-    for index in range( inputDataFeatures.shape[0] ):
+    for index in tqdm( range( inputDataFeatures.shape[0] ) ):
         inputData = inputDataFeatures[index+0:index+1] 
         
         currentPrice                 = inputDataFrame['price'                  ].values[index]
         currentTotalSquare           = inputDataFrame['total_square'           ].values[index]
         currentKitchenSquare         = inputDataFrame['kitchen_square'         ].values[index]
         currentNumberOfRooms         = inputDataFrame['number_of_rooms'        ].values[index]
+        currentNumberOfFloors        = inputDataFrame['number_of_floors'       ].values[index]
         currentExploitationStartYear = inputDataFrame['exploitation_start_year'].values[index]
         
-        distance_s, index_s = searchTree.query( inputData, k=5 )
+        index_s, distance_s = searchTree.query_radius( inputData, distance_limit, count_only=False, return_distance=True )
+        index_s    = index_s   [0].astype(np.int32  )
+        distance_s = distance_s[0].astype(np.float32)
+        #distance_s, index_s = searchTree.query( inputData, k=5 )
         #distance_s, index_s = searchTree.query( inputData, r=0.05, k=5 )
         
         Price_s                 = inputDataFrame['price'                  ].values[index_s] 
         totalSquare_s           = inputDataFrame['total_square'           ].values[index_s] 
+        numberOfFloor_s         = inputDataFrame['number_of_floors'       ].values[index_s]
         numberOfRooms_s         = inputDataFrame['number_of_rooms'        ].values[index_s] 
         exploitationStartYear_s = inputDataFrame['exploitation_start_year'].values[index_s] 
         
-        mask = distance_s < 0.03;
+        mask = distance_s < distance_limit;
         
-        if np.sum( mask ) >= 3:
+        if np.sum( mask ) >= 5:
             totalPricePerSquare_s = Price_s / totalSquare_s
             
             totalMedianPricePerSquare = np.median( totalPricePerSquare_s )
@@ -126,18 +152,22 @@ else :
             totalMedianPrice_s         [ index ] = totalMedianPricePerSquare*currentTotalSquare 
             totalMeanPrice_s           [ index ] = totalMeanPricePerSquare  *currentTotalSquare 
     
-    
     mask = totalMedianPrice_s > 0
     outputDataFrame['price'] = totalMedianPrice_s
     outputDataFrame = outputDataFrame[ mask ]
     
-    engine = create_engine( databaseName )
+    totalMedianPricePerSquare_s = totalMedianPricePerSquare_s[ mask ]
+    totalMeanPricePerSquare_s   = totalMeanPricePerSquare_s  [ mask ]
+    
+    engine = create_engine( outputDatabase )
     engine.execute("DROP TABLE IF EXISTS {}".format( outputTable ) )
     outputDataFrame.to_sql(outputTable, con=engine)
-    
+    print("After<-")
+    print( outputDataFrame[ FLOAT_COLUMNS+INT_COLUMNS ].describe() )
+
     fig, ax = plt.subplots()
     ax.set_title('medianPrice')
-    ax.hist( totalMedianPricePerSquare_s, bins=20, color='r')
+    ax.hist( totalMedianPricePerSquare_s, bins=100, color='r')
     plt.show()
 
 
