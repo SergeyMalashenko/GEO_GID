@@ -8,7 +8,7 @@ import pandas            as pd
 import numpy             as np
 from sklearn.preprocessing      import RobustScaler
 from sklearn.ensemble import IsolationForest
-
+from sklearn.neighbors import NearestNeighbors
 
 from sqlalchemy import create_engine
 from datetime   import datetime
@@ -44,17 +44,21 @@ class loadDataFrame(object):
             sql_query += """ AND living_square + kitchen_square <= total_square""".format(tableName)
 
         resultValues = pd.read_sql_query(sql_query, engine)
+
+        if 'publication_date' in resultValues.columns :
+            resultValues = resultValues.sort_values(by=['publication_date'])
+
         subset = ['longitude', 'latitude', 'total_square', 'number_of_rooms', 'number_of_floors', 'floor_number']
-        resultValues.drop_duplicates(subset=subset, keep='first', inplace=True)
+        resultValues.drop_duplicates(subset=subset, keep='last', inplace=True)
         return resultValues
 
 def clearDataFromAnomalies( inputDataFrame ):
-    clf = IsolationForest(n_estimators=20, max_features=(len(all_columns)-3), n_jobs=-1)
+    clf = IsolationForest(n_estimators=20, max_features=(len(all_columns)-2), n_jobs=-1)
     inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
     all_columns_new = all_columns+['pricePerSquare']
     all_columns_new.remove('distance_to_metro')
     all_columns_new.remove('floor_number')
-    all_columns_new.remove('number_of_floors')
+
     all_columns_new.remove('price')
 
     inputDataFrame_matrix = inputDataFrame[all_columns_new].to_numpy()
@@ -62,8 +66,9 @@ def clearDataFromAnomalies( inputDataFrame ):
     inputDataFrame_scores = clf.predict(inputDataFrame_matrix)
     f_anomalies = open("anomalies.txt", 'w')
     indexes_to_delete = []
+    indexes_inlier = []
     inputDataFrameMedians = inputDataFrame[all_columns_new].median()
-
+    outlierDataFrame =  inputDataFrame.copy()
     for i in range(0, len(inputDataFrame_scores)):
         data_score = inputDataFrame_scores[i]
         if data_score < 0:
@@ -73,10 +78,21 @@ def clearDataFromAnomalies( inputDataFrame ):
                 if deviation_of_outlier_current > deviation_of_outlier_max:
                     deviation_of_outlier_max = deviation_of_outlier_current
                     dev_feature = feature
-            f_anomalies.write('House source: {4} source_id: {0}, reason: {1} is {2}, when median is {3}.\n'.format(str(inputDataFrame.iloc[i]['source_id']), str(dev_feature), str(inputDataFrame.iloc[i][dev_feature]),str(inputDataFrameMedians[dev_feature]), str(inputDataFrame.iloc[i]['source'])))
+            f_anomalies.write('House fias id: {0}, reason: {1} is {2}, when median is {3}.\n'.format(str(inputDataFrame.iloc[i]['fias_id']), str(dev_feature), str(inputDataFrame.iloc[i][dev_feature]),str(inputDataFrameMedians[dev_feature])))
             indexes_to_delete.append(i)
+        if data_score > 0:
+            indexes_inlier.append(i)
     inputDaraFrame = inputDataFrame.drop(inputDataFrame.index[indexes_to_delete])
+    outlierDataFrame = outlierDataFrame.drop(outlierDataFrame.index[indexes_inlier])
+    outlierDataFrame[all_columns_new].hist(bins=100)
+    plt.show()
+
     f_anomalies.close()
+
+    neigh = NearestNeighbors(n_jobs=-1)
+    neigh.fit(inputDaraFrame[all_columns_new])
+    #outlierDataFrame_subset=outlierDataFrame[['longitude','latitude']].query('56.307 < longitude and longitude < 56.32 and 43.98 < latitude and latitude > 44.03')
+    #print(neigh.kneighbors(outlierDataFrame_subset,return_distance=False))
     return inputDaraFrame
 
 
@@ -86,8 +102,8 @@ parser = argparse.ArgumentParser()
 #parser.add_argument("--database", type=str, default="mysql://root:Intemp200784@127.0.0.1/smartRealtor" )
 #parser.add_argument("--database", type=str, default="mysql://root:Intemp200784@127.0.0.1/smartRealtor?unix_socket=/var/run/mysqld/mysqld.sock" )
 parser.add_argument("--database", type=str, default="mysql://root:UWmnjxPdN5ywjEcN@188.120.245.195:3306/domprice_dev1_v2" )
-parser.add_argument("--input_table"   , type=str, default="real_estate_from_ads_api" )
-#parser.add_argument("--table"   , type=str, default="src_ads_raw" )
+#parser.add_argument("--input_table"   , type=str, default="real_estate_from_ads_api" )
+parser.add_argument("--input_table"   , type=str, default="src_ads_raw" )
 #parser.add_argument("--limits"  , type=str, default="input/MoscowLimits.json" )
 parser.add_argument("--output_table"   , type=str, default="real_estate_from_ads_api_processed" )
 #parser.add_argument("--limits"  , type=str, default="input/KazanLimits.json" )
