@@ -38,13 +38,13 @@ class loadDataFrame(object):
                 field, processedLimits[field]['min'], processedLimits[field]['max']) for field in
             processedLimits.keys())
 
-        if 'floor_number' and 'number_of_floors' in processedLimits.keys():
+        if ('floor_number' in processedLimits.keys()) and ('number_of_floors' in processedLimits.keys()) :
             sql_query += """ AND floor_number <= number_of_floors """
-        if 'total_square' and 'living_square' and 'kitchen_square' in processedLimits.keys():
+        if ('total_square' in processedLimits.keys()) and ('living_square' in processedLimits.keys()) and ('kitchen_square' in processedLimits.keys()):
             sql_query += """ AND living_square + kitchen_square <= total_square""".format(tableName)
 
         resultValues = pd.read_sql_query(sql_query, engine)
-
+        
         if 'publication_date' in resultValues.columns :
             resultValues = resultValues.sort_values(by=['publication_date'])
 
@@ -53,17 +53,18 @@ class loadDataFrame(object):
         return resultValues
 
 def clearDataFromAnomalies( inputDataFrame ):
-    clf = IsolationForest(n_estimators=20, max_features=(len(all_columns)-2), n_jobs=-1)
+    clf = IsolationForest(behaviour='new' )
     inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
+    
     all_columns_new = all_columns+['pricePerSquare']
+    
     all_columns_new.remove('distance_to_metro')
     all_columns_new.remove('floor_number')
-
     all_columns_new.remove('price')
 
-    inputDataFrame_matrix = inputDataFrame[all_columns_new].to_numpy()
-    clf.fit(inputDataFrame_matrix)
-    inputDataFrame_scores = clf.predict(inputDataFrame_matrix)
+    inputDataFrame_numpy = inputDataFrame[all_columns_new].to_numpy()
+    inputDataFrame_scores = clf.fit_predict(inputDataFrame_numpy)
+    """
     f_anomalies = open("anomalies.txt", 'w')
     indexes_to_delete = []
     indexes_inlier = []
@@ -82,18 +83,23 @@ def clearDataFromAnomalies( inputDataFrame ):
             indexes_to_delete.append(i)
         if data_score > 0:
             indexes_inlier.append(i)
-    inputDaraFrame = inputDataFrame.drop(inputDataFrame.index[indexes_to_delete])
-    outlierDataFrame = outlierDataFrame.drop(outlierDataFrame.index[indexes_inlier])
-    outlierDataFrame[all_columns_new].hist(bins=100)
-    plt.show()
-
     f_anomalies.close()
+    """
+    inliersDataFrame  = inputDataFrame[ inputDataFrame_scores == 1 ]
+    outliersDataFrame = inputDataFrame[ inputDataFrame_scores ==-1 ]
+    outliersDataFrame[all_columns_new + ['publication_date']].hist(bins=100)
+    outliersDataFrame[all_columns_new + ['publication_date']].plot.scatter('latitude','longitude')
+    
+    #outliersDataFrame.groupby(outliersDataFrame.publication_date.dt.month).count().plot(kind="bar") 
+    #print( outliersDataFrame[all_columns_new + ['publication_date']].describe( include=['number','datetime']) )
 
+    plt.show()
+    
     #neigh = NearestNeighbors(n_jobs=-1)
     #neigh.fit(inputDaraFrame[all_columns_new])
     #outlierDataFrame_subset=outlierDataFrame[['longitude','latitude']].query('56.307 < longitude and longitude < 56.32 and 43.98 < latitude and latitude > 44.03')
     #print(neigh.kneighbors(outlierDataFrame_subset,return_distance=False))
-    return inputDaraFrame
+    return inputDataFrame
 
 
 parser = argparse.ArgumentParser()
@@ -111,13 +117,12 @@ parser.add_argument("--limits"  , type=str, default="input/NizhnyNovgorodLimits.
 #parser.add_argument("--limits"  , type=str, default="input/SaintPetersburgLimits.json" )
 args = parser.parse_args()
 
-input_tableName = args.input_table
-databaseName = args.database
-limitsName   = args.limits
+inputTableName = args.input_table
+databaseName   = args.database
+limitsName     = args.limits
 
 inputDataFrame = None
-inputDataFrame = loadDataFrame()(databaseName, limitsName, input_tableName )
-
+inputDataFrame = loadDataFrame()(databaseName, limitsName, inputTableName )
 
 print("Statistics of load data frame:")
 print(inputDataFrame[all_columns].describe())
