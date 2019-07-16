@@ -89,8 +89,8 @@ def clearDataFromAnomalies( inputDataFrame ):
 
     f_anomalies.close()
 
-    neigh = NearestNeighbors(n_jobs=-1)
-    neigh.fit(inputDaraFrame[all_columns_new])
+    #neigh = NearestNeighbors(n_jobs=-1)
+    #neigh.fit(inputDaraFrame[all_columns_new])
     #outlierDataFrame_subset=outlierDataFrame[['longitude','latitude']].query('56.307 < longitude and longitude < 56.32 and 43.98 < latitude and latitude > 44.03')
     #print(neigh.kneighbors(outlierDataFrame_subset,return_distance=False))
     return inputDaraFrame
