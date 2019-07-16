@@ -16,7 +16,7 @@ from datetime   import datetime
 import argparse
 import json
 import time
-
+import math
 
 from commonModel import limitDataUsingProcentiles
 from commonModel import FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, DATE_COLUMNS, TARGET_COLUMN
@@ -38,24 +38,42 @@ class loadDataFrame(object):
                 field, processedLimits[field]['min'], processedLimits[field]['max']) for field in
             processedLimits.keys())
 
+        if 'floor_number' and 'number_of_floors' in processedLimits.keys():
+            sql_query += """ AND floor_number <= number_of_floors """
+        if 'total_square' and 'living_square' and 'kitchen_square' in processedLimits.keys():
+            sql_query += """ AND living_square + kitchen_square <= total_square""".format(tableName)
+
         resultValues = pd.read_sql_query(sql_query, engine)
         subset = ['longitude', 'latitude', 'total_square', 'number_of_rooms', 'number_of_floors', 'floor_number']
         resultValues.drop_duplicates(subset=subset, keep='first', inplace=True)
         return resultValues
 
 def clearDataFromAnomalies( inputDataFrame ):
-    clf = IsolationForest(n_estimators=10, max_samples=100, max_features=(len(all_columns)), n_jobs=-1)
-    inputDataFrame_matrix = inputDataFrame[all_columns].to_numpy()
+    clf = IsolationForest(n_estimators=20, max_features=(len(all_columns)-3), n_jobs=-1)
+    inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
+    all_columns_new = all_columns+['pricePerSquare']
+    all_columns_new.remove('distance_to_metro')
+    all_columns_new.remove('floor_number')
+    all_columns_new.remove('number_of_floors')
+    all_columns_new.remove('price')
+
+    inputDataFrame_matrix = inputDataFrame[all_columns_new].to_numpy()
     clf.fit(inputDataFrame_matrix)
     inputDataFrame_scores = clf.predict(inputDataFrame_matrix)
     f_anomalies = open("anomalies.txt", 'w')
     indexes_to_delete = []
+    inputDataFrameMedians = inputDataFrame[all_columns_new].median()
+
     for i in range(0, len(inputDataFrame_scores)):
         data_score = inputDataFrame_scores[i]
         if data_score < 0:
-            outlier = dict(zip(all_columns, inputDataFrame_matrix[i]))
-            f_anomalies.write(str(outlier))
-            f_anomalies.write(str('\n'))
+            deviation_of_outlier_max = -1
+            for feature in (all_columns_new):
+                deviation_of_outlier_current = math.fabs((inputDataFrame.iloc[i][feature]-inputDataFrameMedians[feature])/inputDataFrame.iloc[i][feature])
+                if deviation_of_outlier_current > deviation_of_outlier_max:
+                    deviation_of_outlier_max = deviation_of_outlier_current
+                    dev_feature = feature
+            f_anomalies.write('House source: {4} source_id: {0}, reason: {1} is {2}, when median is {3}.\n'.format(str(inputDataFrame.iloc[i]['source_id']), str(dev_feature), str(inputDataFrame.iloc[i][dev_feature]),str(inputDataFrameMedians[dev_feature]), str(inputDataFrame.iloc[i]['source'])))
             indexes_to_delete.append(i)
     inputDaraFrame = inputDataFrame.drop(inputDataFrame.index[indexes_to_delete])
     f_anomalies.close()
@@ -98,5 +116,3 @@ inputDataFrame = clearDataFromAnomalies(inputDataFrame)
 
 print("Statistics of data frame after cleaning from anomalies:")
 print(inputDataFrame[all_columns].describe())
-
-
