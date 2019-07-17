@@ -6,12 +6,12 @@ from __future__ import print_function
 import matplotlib.pyplot as plt
 import pandas            as pd
 import numpy             as np
-from sklearn.preprocessing      import RobustScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.ensemble import IsolationForest
 from sklearn.neighbors import NearestNeighbors
 
 from sqlalchemy import create_engine
-from datetime   import datetime
+from datetime import datetime
 
 import argparse
 import json
@@ -23,8 +23,11 @@ from commonModel import FLOAT_COLUMNS, INT_COLUMNS, STR_COLUMNS, DATE_COLUMNS, T
 
 from collections import Counter
 
-all_columns = FLOAT_COLUMNS+INT_COLUMNS
-pd.options.display.max_columns = len(all_columns)
+all_columns = FLOAT_COLUMNS + INT_COLUMNS
+pd.options.display.max_columns = len(all_columns)+5
+
+
+
 class loadDataFrame(object):
     def __call__(self, databasePath, limitsFileName, tableName):
         engine = create_engine(databasePath, encoding='utf8')
@@ -38,26 +41,28 @@ class loadDataFrame(object):
                 field, processedLimits[field]['min'], processedLimits[field]['max']) for field in
             processedLimits.keys())
 
-        if ('floor_number' in processedLimits.keys()) and ('number_of_floors' in processedLimits.keys()) :
+        if ('floor_number' in processedLimits.keys()) and ('number_of_floors' in processedLimits.keys()):
             sql_query += """ AND floor_number <= number_of_floors """
-        if ('total_square' in processedLimits.keys()) and ('living_square' in processedLimits.keys()) and ('kitchen_square' in processedLimits.keys()):
+        if ('total_square' in processedLimits.keys()) and ('living_square' in processedLimits.keys()) and (
+                'kitchen_square' in processedLimits.keys()):
             sql_query += """ AND living_square + kitchen_square <= total_square""".format(tableName)
 
         resultValues = pd.read_sql_query(sql_query, engine)
-        
-        if 'publication_date' in resultValues.columns :
+
+        if 'publication_date' in resultValues.columns:
             resultValues = resultValues.sort_values(by=['publication_date'])
 
         subset = ['longitude', 'latitude', 'total_square', 'number_of_rooms', 'number_of_floors', 'floor_number']
         resultValues.drop_duplicates(subset=subset, keep='last', inplace=True)
         return resultValues
 
-def clearDataFromAnomalies( inputDataFrame ):
-    clf = IsolationForest(behaviour='new' )
+
+def clearDataFromAnomalies(inputDataFrame):
+    clf = IsolationForest(behaviour='new',contamination=0.0125,n_jobs=-1)
     inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
-    
-    all_columns_new = all_columns+['pricePerSquare']
-    
+
+    all_columns_new = all_columns + ['pricePerSquare']
+
     all_columns_new.remove('distance_to_metro')
     all_columns_new.remove('floor_number')
     all_columns_new.remove('price')
@@ -85,55 +90,83 @@ def clearDataFromAnomalies( inputDataFrame ):
             indexes_inlier.append(i)
     f_anomalies.close()
     """
-    inliersDataFrame  = inputDataFrame[ inputDataFrame_scores == 1 ]
-    outliersDataFrame = inputDataFrame[ inputDataFrame_scores ==-1 ]
+    inliersDataFrame = inputDataFrame[inputDataFrame_scores == 1]
+    outliersDataFrame = inputDataFrame[inputDataFrame_scores == -1]
     outliersDataFrame[all_columns_new + ['publication_date']].hist(bins=100)
-    outliersDataFrame[all_columns_new + ['publication_date']].plot.scatter('latitude','longitude')
-    
-    #outliersDataFrame.groupby(outliersDataFrame.publication_date.dt.month).count().plot(kind="bar") 
-    #print( outliersDataFrame[all_columns_new + ['publication_date']].describe( include=['number','datetime']) )
+    outliersDataFrame[all_columns_new + ['publication_date']].plot.scatter('longitude','latitude')
+
+    # outliersDataFrame.groupby(outliersDataFrame.publication_date.dt.month).count().plot(kind="bar")
+    # print( outliersDataFrame[all_columns_new + ['publication_date']].describe( include=['number','datetime']) )
 
     plt.show()
-    
-    #neigh = NearestNeighbors(n_jobs=-1)
-    #neigh.fit(inputDaraFrame[all_columns_new])
-    #outlierDataFrame_subset=outlierDataFrame[['longitude','latitude']].query('56.307 < longitude and longitude < 56.32 and 43.98 < latitude and latitude > 44.03')
-    #print(neigh.kneighbors(outlierDataFrame_subset,return_distance=False))
-    return inputDataFrame
+
+    neigh = NearestNeighbors(algorithm='kd_tree',n_jobs=-1)
+    neigh.fit(inliersDataFrame[all_columns_new])
+    #outliersDataFrame_subset = outliersDataFrame.query('2012 < exploitation_start_year and exploitation_start_year < 2015')
+    outliersDataFrame_subset=outliersDataFrame
+    #print(outliersDataFrame_subset)
+    outliersNeighbors=neigh.kneighbors(outliersDataFrame_subset[all_columns_new],return_distance=False)
+    f_neighbors = open('outliers.txt','w')
+    for i in range (0,len(outliersNeighbors)):
+        #print('Outlier: {0}\n'.format(str(outliersDataFrame_subset.iloc[i][all_columns_new])))
+        f_neighbors.write('Outlier:\n {0}\n'.format(str(outliersDataFrame_subset.iloc[i][all_columns+['source_url']])))
+        #f_neighbors.write('Neighbors:\n {0}\n'.format(str(inliersDataFrame.iloc[outliersNeighbors[i]][all_columns+['pricePerSquare']])))
+    f_neighbors.close()
+    strangeHouses = outliersDataFrame_subset.query('exploitation_start_year < 1960 and number_of_floors > 9 or exploitation_start_year < 1980 and number_of_floors > 19 or exploitation_start_year < 1970 and number_of_floors > 14')
+    print('Strange houses in outliers: {0}'.format(str(len(strangeHouses))))
+    outliersDataFrame[all_columns_new + ['publication_date']].plot.scatter('exploitation_start_year', 'number_of_floors')
+    plt.show()
+    return inliersDataFrame
 
 
 parser = argparse.ArgumentParser()
-#parser.add_argument("--database", type=str, default="mysql://sr:A4y8J6r4@149.154.71.73:3310/sr_dev" )
-#parser.add_argument("--database", type=str, default="mysql://sr:password@portal.smartrealtor.pro:3306/smartrealtor" )
-#parser.add_argument("--database", type=str, default="mysql://root:Intemp200784@127.0.0.1/smartRealtor" )
-#parser.add_argument("--database", type=str, default="mysql://root:Intemp200784@127.0.0.1/smartRealtor?unix_socket=/var/run/mysqld/mysqld.sock" )
-parser.add_argument("--database", type=str, default="mysql://root:UWmnjxPdN5ywjEcN@188.120.245.195:3306/domprice_dev1_v2" )
-#parser.add_argument("--input_table"   , type=str, default="real_estate_from_ads_api" )
-parser.add_argument("--input_table"   , type=str, default="src_ads_raw" )
-#parser.add_argument("--limits"  , type=str, default="input/MoscowLimits.json" )
-parser.add_argument("--output_table"   , type=str, default="real_estate_from_ads_api_processed" )
+# parser.add_argument("--database", type=str, default="mysql://sr:A4y8J6r4@149.154.71.73:3310/sr_dev" )
+# parser.add_argument("--database", type=str, default="mysql://sr:password@portal.smartrealtor.pro:3306/smartrealtor" )
+# parser.add_argument("--database", type=str, default="mysql://root:Intemp200784@127.0.0.1/smartRealtor" )
+# parser.add_argument("--database", type=str, default="mysql://root:Intemp200784@127.0.0.1/smartRealtor?unix_socket=/var/run/mysqld/mysqld.sock" )
+parser.add_argument("--database", type=str,
+                    default="mysql://root:UWmnjxPdN5ywjEcN@188.120.245.195:3306/domprice_dev1_v2")
+# parser.add_argument("--input_table"   , type=str, default="real_estate_from_ads_api" )
+parser.add_argument("--input_table", type=str, default="src_ads_raw")
+# parser.add_argument("--limits"  , type=str, default="input/MoscowLimits.json" )
+parser.add_argument("--output_table", type=str, default="real_estate_from_ads_api_processed")
 #parser.add_argument("--limits"  , type=str, default="input/KazanLimits.json" )
-parser.add_argument("--limits"  , type=str, default="input/NizhnyNovgorodLimits.json" )
-#parser.add_argument("--limits"  , type=str, default="input/SaintPetersburgLimits.json" )
+parser.add_argument("--limits", type=str, default="input/NizhnyNovgorodLimits.json")
+# parser.add_argument("--limits"  , type=str, default="input/SaintPetersburgLimits.json" )
 args = parser.parse_args()
 
 inputTableName = args.input_table
-databaseName   = args.database
-limitsName     = args.limits
+databaseName = args.database
+limitsName = args.limits
 
 inputDataFrame = None
-inputDataFrame = loadDataFrame()(databaseName, limitsName, inputTableName )
+inputDataFrame = loadDataFrame()(databaseName, limitsName, inputTableName)
 
 print("Statistics of load data frame:")
 print(inputDataFrame[all_columns].describe())
 
-
 inputDataFrame = limitDataUsingProcentiles(inputDataFrame)
+#inputDataFrame['exploitation_start_year'].hist(bins=100)
+
+
+#plt.show()
+
 
 print("Statistics of data frame limited using procentiles:")
 print(inputDataFrame[all_columns].describe())
+
+strangeHouses = inputDataFrame.query('exploitation_start_year < 1960 and number_of_floors > 9 or exploitation_start_year < 1980 and number_of_floors > 19 or exploitation_start_year < 1970 and number_of_floors > 14')
+print('Strange houses before isolation forest: {0}'.format(str(len(strangeHouses))))
 
 inputDataFrame = clearDataFromAnomalies(inputDataFrame)
 
 print("Statistics of data frame after cleaning from anomalies:")
 print(inputDataFrame[all_columns].describe())
+
+
+"""
+f_strange_houses=open("strange_houses.txt","w")
+strangeHouses = inputDataFrame.query('exploitation_start_year < 1960 and number_of_floors > 9 or exploitation_start_year < 1980 and number_of_floors > 19 or exploitation_start_year < 1970 and number_of_floors > 14')
+pd.options.display.max_rows = len(strangeHouses)
+f_strange_houses.write('{}\n'.format(str(strangeHouses[['longitude','latitude','new','exploitation_start_year','number_of_floors','fias_id','source_url']])))
+"""
