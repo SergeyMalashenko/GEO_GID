@@ -103,7 +103,7 @@ parser.add_argument("--features", type=str, default="price,latitude,longitude,fl
 parser.add_argument("--verbose", type=bool, default="True")
 args = parser.parse_args()
 inputFileName = args.input    #NizhniyNovgorod.csv
-inputDatabase = args.database #mysql://sr:A4y8J6r4@149.154.71.73:3310/sr_dev nn
+inputDatabase = args.database 
 inputTable    = args.table    #nn
 
 modelFileName  = args.model
