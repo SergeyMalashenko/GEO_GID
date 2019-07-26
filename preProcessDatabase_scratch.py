@@ -9,7 +9,7 @@ import numpy             as np
 from sklearn.preprocessing import RobustScaler
 from sklearn.ensemble import IsolationForest
 from sklearn.neighbors import NearestNeighbors
-
+from sklearn.neighbors import LocalOutlierFactor
 from sqlalchemy import create_engine
 from datetime import datetime
 
@@ -25,8 +25,7 @@ from collections import Counter
 
 all_columns = FLOAT_COLUMNS + INT_COLUMNS
 pd.options.display.max_columns = len(all_columns)+5
-
-
+pd.options.display.max_colwidth = 256
 
 class loadDataFrame(object):
     def __call__(self, databasePath, limitsFileName, tableName):
@@ -58,7 +57,7 @@ class loadDataFrame(object):
 
 
 def clearDataFromAnomalies(inputDataFrame):
-    clf = IsolationForest(behaviour='new',contamination=0.0125,n_jobs=-1)
+    clf = LocalOutlierFactor(contamination=0.05,n_jobs=-1)
     inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
 
     all_columns_new = all_columns + ['pricePerSquare']
@@ -92,11 +91,15 @@ def clearDataFromAnomalies(inputDataFrame):
     """
     inliersDataFrame = inputDataFrame[inputDataFrame_scores == 1]
     outliersDataFrame = inputDataFrame[inputDataFrame_scores == -1]
-    outliersDataFrame[all_columns_new + ['publication_date']].hist(bins=100)
-    outliersDataFrame[all_columns_new + ['publication_date']].plot.scatter('longitude','latitude')
+    outliersDataFrame[all_columns_new].plot.scatter('longitude','latitude')
+    outliersDataFrame[all_columns_new].hist(bins=100)
 
-    # outliersDataFrame.groupby(outliersDataFrame.publication_date.dt.month).count().plot(kind="bar")
-    # print( outliersDataFrame[all_columns_new + ['publication_date']].describe( include=['number','datetime']) )
+    f_outliers = open("outliers.txt", "w")
+    f_outliers.write(str(outliersDataFrame[['source_url']]))
+    f_outliers.flush()
+    f_outliers.close()
+    #outliersDataFrame.groupby(outliersDataFrame.publication_date.dt.month).count().plot(kind="bar")
+    #print( outliersDataFrame[all_columns_new + ['publication_date']].describe( include=['number','datetime']) )
 
     plt.show()
 
@@ -120,25 +123,22 @@ def clearDataFromAnomalies(inputDataFrame):
 
 
 parser = argparse.ArgumentParser()
-# parser.add_argument("--database", type=str, default="mysql://sr:A4y8J6r4@149.154.71.73:3310/sr_dev" )
-# parser.add_argument("--database", type=str, default="mysql://sr:password@portal.smartrealtor.pro:3306/smartrealtor" )
-# parser.add_argument("--database", type=str, default="mysql://root:Intemp200784@127.0.0.1/smartRealtor" )
-# parser.add_argument("--database", type=str, default="mysql://root:Intemp200784@127.0.0.1/smartRealtor?unix_socket=/var/run/mysqld/mysqld.sock" )
+
 parser.add_argument("--database", type=str,
-                    default="mysql://root:UWmnjxPdN5ywjEcN@188.120.245.195:3306/domprice_dev1_v2")
+                    default="mysql://root:password@188.120.245.195:3306/domprice_dev1_v2")
 # parser.add_argument("--input_table"   , type=str, default="real_estate_from_ads_api" )
-parser.add_argument("--input_table", type=str, default="src_ads_raw")
+parser.add_argument("--input_table", type=str, default="src_ads_raw_16")
 # parser.add_argument("--limits"  , type=str, default="input/MoscowLimits.json" )
-parser.add_argument("--output_table", type=str, default="real_estate_from_ads_api_processed")
-#parser.add_argument("--limits"  , type=str, default="input/KazanLimits.json" )
-parser.add_argument("--limits", type=str, default="input/NizhnyNovgorodLimits.json")
-# parser.add_argument("--limits"  , type=str, default="input/SaintPetersburgLimits.json" )
+parser.add_argument("--output_table", type=str, default="")
+parser.add_argument("--limits"  , type=str, default="input/KazanLimits.json" )
+#parser.add_argument("--limits", type=str, default="input/NizhnyNovgorodLimits.json")
+#parser.add_argument("--limits"  , type=str, default="input/SaintPetersburgLimits.json" )
 args = parser.parse_args()
 
 inputTableName = args.input_table
 databaseName = args.database
 limitsName = args.limits
-
+outputTableName = args.output_table
 inputDataFrame = None
 inputDataFrame = loadDataFrame()(databaseName, limitsName, inputTableName)
 
@@ -146,9 +146,12 @@ print("Statistics of load data frame:")
 print(inputDataFrame[all_columns].describe())
 
 inputDataFrame = limitDataUsingProcentiles(inputDataFrame)
-#inputDataFrame['exploitation_start_year'].hist(bins=100)
+inputDataFrame['exploitation_start_year'].hist(bins=100)
 
+if outputTableName == "":
+    outputTableName = inputTableName + "_processed"
 
+print(outputTableName)
 #plt.show()
 
 
@@ -156,13 +159,14 @@ print("Statistics of data frame limited using procentiles:")
 print(inputDataFrame[all_columns].describe())
 
 strangeHouses = inputDataFrame.query('exploitation_start_year < 1960 and number_of_floors > 9 or exploitation_start_year < 1980 and number_of_floors > 19 or exploitation_start_year < 1970 and number_of_floors > 14')
-print('Strange houses before isolation forest: {0}'.format(str(len(strangeHouses))))
+print('Strange houses before cleaning anomalies: {0}'.format(str(len(strangeHouses))))
 
 inputDataFrame = clearDataFromAnomalies(inputDataFrame)
 
 print("Statistics of data frame after cleaning from anomalies:")
 print(inputDataFrame[all_columns].describe())
-
+engine = create_engine(databaseName, encoding='utf8')
+inputDataFrame.to_sql(name=outputTableName,con=engine,if_exists='replace')
 
 """
 f_strange_houses=open("strange_houses.txt","w")
