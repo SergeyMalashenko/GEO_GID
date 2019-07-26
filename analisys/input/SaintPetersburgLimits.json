@@ -1,0 +1,21 @@
+{
+	"total_square"    : 
+		{ "min" : 12    , "max" : 3000      },
+	"living_square"   : 
+		{ "min" : 8     , "max" : 3000      },
+	"kitchen_square"  : 
+		{ "min" : 4     , "max" : 100       },
+	"number_of_rooms" : 
+		{ "min" : 1     , "max" : 10        },
+	"floor_number"    : 
+		{ "min" : 1     , "max" : 60        },
+	"number_of_floors":
+		{ "min" : 2     , "max" : 60        },
+	
+	"latitude"  : 
+		{ "min" : 59.66 , "max" : 60.23     },
+	"longitude"       : 
+		{ "min" : 29.44 , "max" : 30.76     },
+
+}
+
