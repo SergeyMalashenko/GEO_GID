@@ -18,7 +18,8 @@ import json
 import warnings
 
 from pylab import rcParams
-rcParams['figure.figsize'] = 15, 10
+rcParams['figure.figsize'] = 12, 9
+plt.rcParams.update({'font.size': 16})
 import matplotlib.dates as mdates
 
 
@@ -65,6 +66,12 @@ def limitDataUsingProcentiles(dataFrame):
         dataFrame = dataFrame[mask]
 
     return dataFrame
+def metroMeanPrice(start_date,end_date,inputDataFrame,city):
+    inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
+    inputDataFrame = inputDataFrame.groupby(['metro']).mean()
+    print(inputDataFrame[['pricePerSquare']])
+
+
 
 def cityDistrictDiagram(start_date,end_date,inputDataFrame,city):
     inputDataFrame = inputDataFrame.sort_values(by=['city_district'])
@@ -81,17 +88,19 @@ def cityDistrictDiagram(start_date,end_date,inputDataFrame,city):
             print(df)
             df.plot.pie(y='Территориальная структура рынка готового жилья', autopct='%1.1f%%')
             plt.ylabel('', fontweight='bold')
-            plt.title('Территориальная структура рынка готового жилья {}'.format(str(Moscow_AO)), fontweight='bold')
-            plt.legend(loc='upper right')
-            plt.savefig('/output/{0}/Территориальная структура рынка готового жилья {1}.png'.format(str(city),str(Moscow_AO)))
+            plt.title('Территориальная структура рынка готового жилья {}'.format(str(Moscow_AO)), fontweight='bold', fontsize = 20)
+            plt.legend(loc='upper right', fontsize = 16)
+            plt.tick_params(axis='both', which='major', labelsize=16)
+            plt.savefig('output/{0}/Территориальная структура рынка готового жилья {1}.png'.format(str(city),str(Moscow_AO)))
     else:
         print(inputDataFrame[['city_district','count_of_city_district']])
         df = pd.DataFrame({'Территориальная структура рынка готового жилья': inputDataFrame['count_of_city_district'].values }, index = inputDataFrame['city_district'])
         df = df[df.index != '']
         df.plot.pie(y='Территориальная структура рынка готового жилья', autopct='%1.1f%%')
         plt.ylabel('', fontweight='bold')
-        plt.title('Территориальная структура рынка готового жилья', fontweight='bold')
+        plt.title('Территориальная структура рынка готового жилья', fontweight='bold', fontsize = 20)
         plt.legend(loc='upper right')
+        plt.tick_params(axis='both', which='major', labelsize=16)
         if city == '':
             plt.show()
         else:
@@ -104,7 +113,8 @@ def numberOfRoomsDiagram(start_date,end_date,inputDataFrame,city):
     df = pd.DataFrame({'Структура рынка готового жилья по количеству комнат': [inputDataFrame.iloc[0]['count_of_number_of_rooms'],inputDataFrame.iloc[1]['count_of_number_of_rooms'],inputDataFrame.iloc[2]['count_of_number_of_rooms'],inputDataFrame.iloc[3]['count_of_number_of_rooms'], inputDataFrame.loc[inputDataFrame['number_of_rooms'] > 4, 'count_of_number_of_rooms'].sum()]}, index=['1-комн.','2-комн.','3-комн.','4-комн.','>4-комн.'])
     df.plot.pie(y='Структура рынка готового жилья по количеству комнат', autopct='%1.1f%%')
     plt.ylabel('', fontweight='bold')
-    plt.title('Структура рынка готового жилья по количеству комнат', fontweight='bold')
+    plt.title('Структура рынка готового жилья по количеству комнат', fontweight='bold', fontsize = 20)
+    plt.tick_params(axis='both', which='major', labelsize=16)
     if city == '':
         plt.show()
     else:
@@ -118,9 +128,10 @@ def buildingTypeDiagram(start_date,end_date,inputDataFrame,city):
         inputDataFrame = inputDataFrame.loc[inputDataFrame['building_type'].values!='Другое']
     df = pd.DataFrame({'Структура рынка по типам готового жилья': inputDataFrame['count_of_building_type'].values}, index=inputDataFrame['building_type'])
     df = df[df.index != '']
-    df.plot.pie(y='Структура рынка по типам готового жилья',autopct='%1.2f%%',fontsize=8)
+    df.plot.pie(y='Структура рынка по типам готового жилья',autopct='%1.2f%%', fontsize = 16)
     plt.ylabel('', fontweight='bold')
-    plt.title('Структура рынка по типам готового жилья', fontweight='bold')
+    plt.tick_params(axis='both', which='major', labelsize=16)
+    plt.title('Структура рынка по типам готового жилья', fontweight='bold', fontsize = 20)
     if city == '':
         plt.show()
     else:
@@ -136,17 +147,20 @@ def dynamicsOfMeanPrice(start_date,end_date,inputDataFrame,city):
     bars =  ax.bar(x=inputDataFrame.index, height=inputDataFrame['pricePerSquare'],width=25,color=['cadetblue','skyblue'],align='center')
     for p in ax.patches:
         ax.annotate(int(np.round(p.get_height(), decimals=0)), (p.get_x() + p.get_width() / 2., p.get_height()),
-                    ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=8, textcoords='offset points')
+                    ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=12, textcoords='offset points')
     deviation_of_price = (inputDataFrame.iloc[len(inputDataFrame)-1]['pricePerSquare']-inputDataFrame.iloc[0]['pricePerSquare'])/inputDataFrame.iloc[0]['pricePerSquare']
-    plt.text(x=0.95,y=0.975,s="{:.1%}".format(deviation_of_price),fontsize=12,fontweight='bold', bbox=dict(facecolor='red', alpha=0.5),transform=ax.transAxes)
-    plt.ylabel('руб./кв.м.',fontweight='bold')
+    plt.text(x=0.95,y=0.975,s="{:.1%}".format(deviation_of_price), fontsize = 16,fontweight='bold', bbox=dict(facecolor='red', alpha=0.5),transform=ax.transAxes)
+    plt.ylabel('руб./кв.м.',fontweight='bold', fontsize = 16)
+    plt.tick_params(axis='both', which='major', labelsize=10)
     months = mdates.MonthLocator()
     months_fmt = mdates.DateFormatter('%m-%Y')
     ax.xaxis.set_major_locator(months)
     ax.xaxis.set_major_formatter(months_fmt)
     ax.xaxis.set_minor_locator(months)
     ax.xaxis.set_major_formatter(months_fmt)
-    plt.title('Изменение средней цены предложения на рынке готового жилья',fontweight='bold')
+    plt.tick_params(axis='both', which='major', labelsize=16)
+    plt.xticks(rotation='vertical')
+    plt.title('Изменение средней цены предложения на рынке готового жилья',fontweight='bold', fontsize = 20)
     if city == '':
         plt.show()
     else:
@@ -160,11 +174,14 @@ def buildingTypeAndMeanPrice(start_date,end_date,inputDataFrame,city):
     inputDataFrame = inputDataFrame[inputDataFrame.index != '']
     inputDataFrame = inputDataFrame[inputDataFrame.index !='Другое']
     fig, ax = plt.subplots()
+    plt.tick_params(axis='both', which='major', labelsize=16)
     bars = ax.bar(x=inputDataFrame.index, height=inputDataFrame['pricePerSquare'],color=color)
     for p in ax.patches:
         ax.annotate(int(np.round(p.get_height(), decimals=0)), (p.get_x() + p.get_width() / 2., p.get_height()),
-                    ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=8, textcoords='offset points')
-    plt.ylabel('руб./кв.м.',fontweight='bold')
+                    ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=16, textcoords='offset points')
+    plt.ylabel('руб./кв.м.',fontweight='bold', fontsize = 16)
+
+    plt.title('Cредняя цена предложения по типам готового жилья', fontweight='bold', fontsize=20)
     if city == '':
         plt.show()
     else:
@@ -210,10 +227,13 @@ def buildingTypeAndMeanPriceCityDistricts(start_date,end_date,inputDataFrame,cit
         print(df)
         ax = df.plot.bar(width=1,color=color)
         for p in ax.patches:
-            ax.annotate(int(np.round(p.get_height(),decimals=0)), (p.get_x()+p.get_width()/2., p.get_height()), ha='center', va='center', xytext=(0, 10),fontweight='bold',fontsize=8, textcoords='offset points')
-        plt.ylabel('руб./кв.м.', fontweight='bold')
+            ax.annotate(int(np.round(p.get_height(),decimals=0)), (p.get_x()+p.get_width()/2., p.get_height()), ha='center', va='center', xytext=(0, 10),fontweight='bold',fontsize=9, textcoords='offset points')
+        plt.ylabel('руб./кв.м.', fontweight='bold', fontsize = 16)
         plt.legend()
-        plt.title('{} район средняя цена предложения по типам квартир и числу комнат'.format(cityDistrict), fontweight='bold')
+        plt.xlabel('')
+        plt.tick_params(axis='both', which='major', labelsize=16)
+        plt.xticks(rotation='horizontal')
+        plt.title('{} район средняя цена предложения по типам квартир и числу комнат'.format(cityDistrict), fontweight='bold', fontsize = 16)
         if city == '':
             plt.show()
         else:
@@ -267,16 +287,16 @@ class loadDataFrame(object):
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--database", type=str, default="mysql://root:UWmnjxPdN5ywjEcN@188.120.245.195:3306/domprice_dev1_v2?charset=utf8" )
-parser.add_argument("--input_table"   , type=str, default="src_ads_raw_77" )
-parser.add_argument("--limits"  , type=str, default="input/MoscowLimits.json" )
+parser.add_argument("--database", type=str, default="mysql://root:password@188.120.245.195:3306/domprice_dev1_v2?charset=utf8" )
+parser.add_argument("--input_table"   , type=str, default="src_ads_raw_52" )
+#parser.add_argument("--limits"  , type=str, default="input/MoscowLimits.json" )
 
 #parser.add_argument("--limits"  , type=str, default="input/KazanLimits.json" )
-#parser.add_argument("--limits"  , type=str, default="input/NizhnyNovgorodLimits.json" )
+parser.add_argument("--limits"  , type=str, default="input/NizhnyNovgorodLimits.json" )
 #parser.add_argument("--limits"  , type=str, default="input/SaintPetersburgLimits.json" )
 parser.add_argument("--start_date"  , type=str, default='2018-07-18' )
 parser.add_argument("--end_date", type=str, default='2019-07-18')
-parser.add_argument("--city", type=str, default='Moscow')
+parser.add_argument("--city", type=str, default='Nizhny Novgorod')
 
 args = parser.parse_args()
 
@@ -297,3 +317,4 @@ buildingTypeDiagram(start_date,end_date,inputDataFrame,city)
 buildingTypeAndMeanPrice(start_date,end_date,inputDataFrame,city)
 dynamicsOfMeanPrice(start_date,end_date,inputDataFrame,city)
 buildingTypeAndMeanPriceCityDistricts(start_date,end_date,inputDataFrame,city)
+#metroMeanPrice(start_date,end_date,inputDataFrame,city)
