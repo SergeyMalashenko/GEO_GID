@@ -357,8 +357,8 @@ class loadDataFrame(object):
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--start_date"  , type=str, default='2018-07-18' )
-parser.add_argument("--end_date", type=str, default='2019-07-18')
+parser.add_argument("--start_date"  , type=str, default='')
+parser.add_argument("--end_date", type=str, default='')
 parser.add_argument("--city", type=str, default='Nizhny Novgorod')
 
 args = parser.parse_args()
@@ -370,8 +370,14 @@ load_dotenv(dotenv_path)
 # Accessing variables.
 databaseName = os.getenv('DATABASE_URL')
 output_Folder = os.getenv('OUTPUT_FOLDER')
-start_date = datetime.datetime.strptime(args.start_date,'%Y-%m-%d')
-end_date = datetime.datetime.strptime(args.end_date,'%Y-%m-%d')
+start_date = args.start_date
+end_date = args.end_date
+#default settings for date:
+if end_date == '':
+    end_date = datetime.date.today()
+if start_date == '':
+    start_date = end_date - datetime.timedelta(days=365)
+
 city = args.city
 inputTableDict = {'Nizhny Novgorod': 'src_ads_raw_52','Kazan': 'src_ads_raw_16',
                   'Saint Petersburg': 'src_ads_raw_78','Moscow': 'src_ads_raw_77'}
