@@ -3,8 +3,9 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
-
+from os.path import join, dirname
+from dotenv import load_dotenv
+import os
 import matplotlib.pyplot as plt
 import pandas            as pd
 import numpy             as np
@@ -66,14 +67,8 @@ def limitDataUsingProcentiles(dataFrame):
         dataFrame = dataFrame[mask]
 
     return dataFrame
-def metroMeanPrice(start_date,end_date,inputDataFrame,city):
-    inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
-    inputDataFrame = inputDataFrame.groupby(['metro']).mean()
-    print(inputDataFrame[['pricePerSquare']])
 
-
-
-def cityDistrictDiagram(start_date,end_date,inputDataFrame,city):
+def cityDistrictDiagram(inputDataFrame,city,output_Folder):
     inputDataFrame = inputDataFrame.sort_values(by=['city_district'])
     inputDataFrame = inputDataFrame.groupby(['city_district']).size().reset_index(name='count_of_city_district')
     if city == 'Moscow':
@@ -85,17 +80,28 @@ def cityDistrictDiagram(start_date,end_date,inputDataFrame,city):
                 {'Территориальная структура рынка готового жилья': Moscow_AODataFrame['count_of_city_district'].values},
                 index=Moscow_AODataFrame.index)
             df = df.dropna()
+            df = df.apply(lambda x: 100 * x / float(x.sum()))
             print(df)
+            df = df.sort_values(by='Территориальная структура рынка готового жилья',ascending=False)
+            with open('{2}/{0}/Территориальная структура рынка готового жилья {1}.json'.format(str(city),str(Moscow_AO),
+                                                            str(output_Folder)), "w", encoding="utf-8") as write_file:
+                json.dump(df.to_json(force_ascii=False,double_precision=2), write_file, ensure_ascii=False)
             df.plot.pie(y='Территориальная структура рынка готового жилья', autopct='%1.1f%%')
+
             plt.ylabel('', fontweight='bold')
             plt.title('Территориальная структура рынка готового жилья {}'.format(str(Moscow_AO)), fontweight='bold', fontsize = 20)
             plt.legend(loc='upper right', fontsize = 16)
             plt.tick_params(axis='both', which='major', labelsize=16)
-            plt.savefig('output/{0}/Территориальная структура рынка готового жилья {1}.png'.format(str(city),str(Moscow_AO)))
+            plt.savefig('{2}/{0}/Территориальная структура рынка готового жилья {1}.png'.format(str(city),str(Moscow_AO),str(output_Folder)))
     else:
-        print(inputDataFrame[['city_district','count_of_city_district']])
         df = pd.DataFrame({'Территориальная структура рынка готового жилья': inputDataFrame['count_of_city_district'].values }, index = inputDataFrame['city_district'])
         df = df[df.index != '']
+        df = df.apply(lambda x: 100 * x / float(x.sum()))
+        df = df.sort_values(by='Территориальная структура рынка готового жилья',ascending=False)
+        print(df)
+        with open('{1}/{0}/Территориальная структура рынка готового жилья.json'.format(str(city),str(output_Folder)),
+                  "w", encoding="utf-8") as write_file:
+            json.dump(df.to_json(force_ascii=False,double_precision=2), write_file, ensure_ascii=False)
         df.plot.pie(y='Территориальная структура рынка готового жилья', autopct='%1.1f%%')
         plt.ylabel('', fontweight='bold')
         plt.title('Территориальная структура рынка готового жилья', fontweight='bold', fontsize = 20)
@@ -104,24 +110,29 @@ def cityDistrictDiagram(start_date,end_date,inputDataFrame,city):
         if city == '':
             plt.show()
         else:
-            plt.savefig('output/{0}/Территориальная структура рынка готового жилья.png'.format(str(city)))
+            plt.savefig('{1}/{0}/Территориальная структура рынка готового жилья.png'.format(str(city),str(output_Folder)))
 
 
-def numberOfRoomsDiagram(start_date,end_date,inputDataFrame,city):
+def numberOfRoomsDiagram(inputDataFrame,city,output_Folder):
     inputDataFrame = inputDataFrame.groupby(['number_of_rooms']).size().reset_index(name='count_of_number_of_rooms')
     print(inputDataFrame[['number_of_rooms', 'count_of_number_of_rooms']])
     df = pd.DataFrame({'Структура рынка готового жилья по количеству комнат': [inputDataFrame.iloc[0]['count_of_number_of_rooms'],inputDataFrame.iloc[1]['count_of_number_of_rooms'],inputDataFrame.iloc[2]['count_of_number_of_rooms'],inputDataFrame.iloc[3]['count_of_number_of_rooms'], inputDataFrame.loc[inputDataFrame['number_of_rooms'] > 4, 'count_of_number_of_rooms'].sum()]}, index=['1-комн.','2-комн.','3-комн.','4-комн.','>4-комн.'])
     df.plot.pie(y='Структура рынка готового жилья по количеству комнат', autopct='%1.1f%%')
+    df = df.apply(lambda x: 100 * x / float(x.sum()))
+    print(df)
+    df = df.sort_values(by='Структура рынка готового жилья по количеству комнат',ascending=False)
+    with open('{1}/{0}/Структура рынка готового жилья по количеству комнат.json'.format(str(city),str(output_Folder)), "w", encoding="utf-8") as write_file:
+        json.dump(df.to_json(force_ascii=False,double_precision=2), write_file, ensure_ascii=False)
     plt.ylabel('', fontweight='bold')
     plt.title('Структура рынка готового жилья по количеству комнат', fontweight='bold', fontsize = 20)
     plt.tick_params(axis='both', which='major', labelsize=16)
     if city == '':
         plt.show()
     else:
-        plt.savefig('output/{0}/Структура рынка готового жилья по количеству комнат.png'.format(str(city)))
+        plt.savefig('{1}/{0}/Структура рынка готового жилья по количеству комнат.png'.format(str(city),str(output_Folder)))
 
 
-def buildingTypeDiagram(start_date,end_date,inputDataFrame,city):
+def buildingTypeDiagram(inputDataFrame,city,output_Folder):
     inputDataFrame = inputDataFrame.groupby(['building_type']).size().reset_index(name='count_of_building_type')
     print(inputDataFrame[['building_type', 'count_of_building_type']])
     if 'Другое' in inputDataFrame['building_type'].values:
@@ -129,20 +140,26 @@ def buildingTypeDiagram(start_date,end_date,inputDataFrame,city):
     df = pd.DataFrame({'Структура рынка по типам готового жилья': inputDataFrame['count_of_building_type'].values}, index=inputDataFrame['building_type'])
     df = df[df.index != '']
     df.plot.pie(y='Структура рынка по типам готового жилья',autopct='%1.2f%%', fontsize = 16)
+    df = df.apply(lambda x: 100 * x / float(x.sum()))
+    print(df)
+    df = df.sort_values(by='Структура рынка по типам готового жилья',ascending=False)
+    with open('{1}/{0}/Структура рынка по типам готового жилья.json'.format(str(city),str(output_Folder)), "w", encoding="utf-8") as write_file:
+        json.dump(df.to_json(force_ascii=False,double_precision=2), write_file, ensure_ascii=False)
     plt.ylabel('', fontweight='bold')
     plt.tick_params(axis='both', which='major', labelsize=16)
     plt.title('Структура рынка по типам готового жилья', fontweight='bold', fontsize = 20)
     if city == '':
         plt.show()
     else:
-        plt.savefig('output/{0}/Структура рынка по типам готового жилья.png'.format(str(city)))
+        plt.savefig('{1}/{0}/Структура рынка по типам готового жилья.png'.format(str(city),str(output_Folder)))
 
 
-def dynamicsOfMeanPrice(start_date,end_date,inputDataFrame,city):
+def dynamicsOfMeanPrice(inputDataFrame,city,output_Folder):
     inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
     inputDataFrame = inputDataFrame.groupby(['publication_date']).mean()
     inputDataFrame = inputDataFrame.groupby(pd.Grouper(freq='MS')).mean()
     print(inputDataFrame['pricePerSquare'])
+
     fig, ax = plt.subplots()
     bars =  ax.bar(x=inputDataFrame.index, height=inputDataFrame['pricePerSquare'],width=25,color=['cadetblue','skyblue'],align='center')
     for p in ax.patches:
@@ -158,16 +175,19 @@ def dynamicsOfMeanPrice(start_date,end_date,inputDataFrame,city):
     ax.xaxis.set_major_formatter(months_fmt)
     ax.xaxis.set_minor_locator(months)
     ax.xaxis.set_major_formatter(months_fmt)
-    plt.tick_params(axis='both', which='major', labelsize=16)
+    plt.tick_params(axis='both', which='major', labelsize=14)
     plt.xticks(rotation='vertical')
     plt.title('Изменение средней цены предложения на рынке готового жилья',fontweight='bold', fontsize = 20)
     if city == '':
         plt.show()
     else:
-        plt.savefig('output/{0}/Изменение средней цены предложения на рынке готового жилья.png'.format(str(city)))
+        plt.savefig('{1}/{0}/Изменение средней цены предложения на рынке готового жилья.png'.format(str(city),str(output_Folder)))
+    inputDataFrame.index = inputDataFrame.index.strftime("%Y-%m")
+    with open('{1}/{0}/Изменение средней цены предложения на рынке готового жилья.json'.format(str(city),str(output_Folder)), "w", encoding="utf-8") as write_file:
+        json.dump(inputDataFrame['pricePerSquare'].to_json(force_ascii=False,date_format='iso',double_precision=0), write_file, ensure_ascii=False)
 
 
-def buildingTypeAndMeanPrice(start_date,end_date,inputDataFrame,city):
+def buildingTypeAndMeanPrice(inputDataFrame,city,output_Folder):
     inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
     inputDataFrame = inputDataFrame.groupby(['building_type']).mean()
     print(inputDataFrame['pricePerSquare'])
@@ -180,15 +200,62 @@ def buildingTypeAndMeanPrice(start_date,end_date,inputDataFrame,city):
         ax.annotate(int(np.round(p.get_height(), decimals=0)), (p.get_x() + p.get_width() / 2., p.get_height()),
                     ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=16, textcoords='offset points')
     plt.ylabel('руб./кв.м.',fontweight='bold', fontsize = 16)
-
+    inputDataFrame = inputDataFrame.sort_values(by='pricePerSquare',ascending=False)
+    print(inputDataFrame['pricePerSquare'])
+    with open('{1}/{0}/Cредняя цена предложения по типам готового жилья.json'.format(str(city),str(output_Folder)), "w", encoding="utf-8") as write_file:
+        json.dump(inputDataFrame['pricePerSquare'].to_json(force_ascii=False,double_precision=0), write_file, ensure_ascii=False)
     plt.title('Cредняя цена предложения по типам готового жилья', fontweight='bold', fontsize=20)
     if city == '':
         plt.show()
     else:
-        plt.savefig('output/{0}/Cредняя цена предложения по типам готового жилья.png'.format(str(city)))
+        plt.savefig('{1}/{0}/Cредняя цена предложения по типам готового жилья.png'.format(str(city),str(output_Folder)))
 
+def cityDistrictAndMeanPrice(inputDataFrame,city,output_Folder):
+    inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
+    inputDataFrame = inputDataFrame.groupby(['city_district']).mean()
+    print(inputDataFrame['pricePerSquare'])
+    inputDataFrame = inputDataFrame[inputDataFrame.index != '']
+    if city == 'Moscow':
+        for Moscow_AO in Districts_Moscow.keys():
+            Districts_AO = Districts_Moscow[Moscow_AO]
+            Moscow_AODataFrame = inputDataFrame.loc[Districts_AO]
+        fig, ax = plt.subplots()
+        plt.tick_params(axis='both', which='major', labelsize=10)
+        bars = ax.bar(x=Moscow_AODataFrame.index, height=Moscow_AODataFrame['pricePerSquare'],color=color)
+        for p in ax.patches:
+            ax.annotate(int(np.round(p.get_height(), decimals=0)), (p.get_x() + p.get_width() / 2., p.get_height()),
+                        ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=16, textcoords='offset points')
+        plt.ylabel('руб./кв.м.',fontweight='bold', fontsize = 16)
+        inputDataFrame = inputDataFrame.sort_values(by='pricePerSquare',ascending=False)
+        print(inputDataFrame['pricePerSquare'])
+        with open('{1}/{0}/Cредняя цена предложения по административным районам {2}.json'.format(str(city),str(output_Folder),str(Moscow_AO)), "w", encoding="utf-8") as write_file:
+            json.dump(inputDataFrame['pricePerSquare'].to_json(force_ascii=False,double_precision=0), write_file, ensure_ascii=False)
+        plt.title('Cредняя цена предложения по административным районам {}'.format(str(Moscow_AO)), fontweight='bold', fontsize=20)
+        plt.savefig(
+            '{1}/{0}/Cредняя цена предложения по административным районам {2}.png'.format(str(city), str(output_Folder),str(Moscow_AO)))
+    else:
+        fig, ax = plt.subplots()
+        plt.tick_params(axis='both', which='major', labelsize=10)
+        bars = ax.bar(x=inputDataFrame.index, height=inputDataFrame['pricePerSquare'], color=color)
+        for p in ax.patches:
+            ax.annotate(int(np.round(p.get_height(), decimals=0)), (p.get_x() + p.get_width() / 2., p.get_height()),
+                        ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=16,
+                        textcoords='offset points')
+        plt.ylabel('руб./кв.м.', fontweight='bold', fontsize=16)
+        inputDataFrame = inputDataFrame.sort_values(by='pricePerSquare', ascending=False)
+        print(inputDataFrame['pricePerSquare'])
+        with open('{1}/{0}/Cредняя цена предложения по административным районам.json'.format(str(city),
+                                                                                             str(output_Folder)), "w",
+                  encoding="utf-8") as write_file:
+            json.dump(inputDataFrame['pricePerSquare'].to_json(force_ascii=False, double_precision=0), write_file,
+                      ensure_ascii=False)
+        plt.title('Cредняя цена предложения по административным районам', fontweight='bold', fontsize=20)
+        if city == '':
+            plt.show()
+        else:
+            plt.savefig('{1}/{0}/Cредняя цена предложения по административным районам.png'.format(str(city),str(output_Folder)))
 
-def buildingTypeAndMeanPriceCityDistricts(start_date,end_date,inputDataFrame,city):
+def buildingTypeAndMeanPriceCityDistricts(inputDataFrame,city,output_Folder):
     inputDataFrame['pricePerSquare'] = (inputDataFrame['price'] / inputDataFrame['total_square'])
     inputDataFrame = inputDataFrame.groupby(['city_district','building_type','number_of_rooms']).mean()
     print(inputDataFrame['pricePerSquare'])
@@ -226,6 +293,9 @@ def buildingTypeAndMeanPriceCityDistricts(start_date,end_date,inputDataFrame,cit
                     df.loc[buildingType, '4-комн. и больше'] = smallDataFrame.loc[smallDataFrame['number_of_rooms'] >= 4]['pricePerSquare'].mean()
         print(df)
         ax = df.plot.bar(width=1,color=color)
+        with open('{2}/{0}/{1} район средняя цена предложения по типам квартир и числу комнат.json'.format(str(city),cityDistrict,str(output_Folder)),"w",
+                  encoding="utf-8") as write_file:
+            json.dump(df.to_json(force_ascii=False,double_precision=0), write_file, ensure_ascii=False)
         for p in ax.patches:
             ax.annotate(int(np.round(p.get_height(),decimals=0)), (p.get_x()+p.get_width()/2., p.get_height()), ha='center', va='center', xytext=(0, 10),fontweight='bold',fontsize=9, textcoords='offset points')
         plt.ylabel('руб./кв.м.', fontweight='bold', fontsize = 16)
@@ -237,7 +307,7 @@ def buildingTypeAndMeanPriceCityDistricts(start_date,end_date,inputDataFrame,cit
         if city == '':
             plt.show()
         else:
-            plt.savefig('output/{0}/{1} район средняя цена предложения по типам квартир и числу комнат.png'.format(str(city),cityDistrict))
+            plt.savefig('{2}/{0}/{1} район средняя цена предложения по типам квартир и числу комнат.png'.format(str(city),cityDistrict,str(output_Folder)))
 
 
 
@@ -287,34 +357,37 @@ class loadDataFrame(object):
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--database", type=str, default="mysql://root:password@188.120.245.195:3306/domprice_dev1_v2?charset=utf8" )
-parser.add_argument("--input_table"   , type=str, default="src_ads_raw_52" )
-#parser.add_argument("--limits"  , type=str, default="input/MoscowLimits.json" )
-
-#parser.add_argument("--limits"  , type=str, default="input/KazanLimits.json" )
-parser.add_argument("--limits"  , type=str, default="input/NizhnyNovgorodLimits.json" )
-#parser.add_argument("--limits"  , type=str, default="input/SaintPetersburgLimits.json" )
 parser.add_argument("--start_date"  , type=str, default='2018-07-18' )
 parser.add_argument("--end_date", type=str, default='2019-07-18')
 parser.add_argument("--city", type=str, default='Nizhny Novgorod')
 
 args = parser.parse_args()
+# Create .env file path.
+dotenv_path = join(dirname(__file__), '.env')
 
-input_tableName = args.input_table
-databaseName = args.database
-limitsName   = args.limits
+# Load file from the path.
+load_dotenv(dotenv_path)
+# Accessing variables.
+databaseName = os.getenv('DATABASE_URL')
+output_Folder = os.getenv('OUTPUT_FOLDER')
 start_date = datetime.datetime.strptime(args.start_date,'%Y-%m-%d')
 end_date = datetime.datetime.strptime(args.end_date,'%Y-%m-%d')
 city = args.city
+inputTableDict = {'Nizhny Novgorod': 'src_ads_raw_52','Kazan': 'src_ads_raw_16',
+                  'Saint Petersburg': 'src_ads_raw_78','Moscow': 'src_ads_raw_77'}
+limitsDict = {'Nizhny Novgorod': 'input/NizhnyNovgorodLimits.json','Kazan': 'input/KazanLimits.json',
+                  'Saint Petersburg': 'input/SaintPetersburgLimits.json','Moscow': 'input/MoscowLimits.json'}
+input_tableName = inputTableDict[city]
+limitsName   = limitsDict[city]
 
 inputDataFrame = None
 inputDataFrame = loadDataFrame()(databaseName, limitsName, input_tableName,start_date,end_date )
 
 
-cityDistrictDiagram(start_date,end_date,inputDataFrame,city)
-numberOfRoomsDiagram(start_date,end_date,inputDataFrame,city)
-buildingTypeDiagram(start_date,end_date,inputDataFrame,city)
-buildingTypeAndMeanPrice(start_date,end_date,inputDataFrame,city)
-dynamicsOfMeanPrice(start_date,end_date,inputDataFrame,city)
-buildingTypeAndMeanPriceCityDistricts(start_date,end_date,inputDataFrame,city)
-#metroMeanPrice(start_date,end_date,inputDataFrame,city)
+cityDistrictDiagram(inputDataFrame,city,output_Folder)
+numberOfRoomsDiagram(inputDataFrame,city,output_Folder)
+buildingTypeDiagram(inputDataFrame,city,output_Folder)
+buildingTypeAndMeanPrice(inputDataFrame,city,output_Folder)
+cityDistrictAndMeanPrice(inputDataFrame,city,output_Folder)
+dynamicsOfMeanPrice(inputDataFrame,city,output_Folder)
+buildingTypeAndMeanPriceCityDistricts(inputDataFrame,city,output_Folder)
