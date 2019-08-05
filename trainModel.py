@@ -243,7 +243,7 @@ def trainNeuralNetworkModel( dataFrame, targetColumn, featureNames, seed=43 ):
     loss_fn       = torch.nn.L1Loss  ( )
     #optimizer     = torch.optim.SGD   ( model.parameters(), lr=learning_rate, momentum=0.9)
     optimizer     = torch.optim.Adam  ( model.parameters(), lr=learning_rate, amsgrad=True, weight_decay=0.001 )
-    scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=500, gamma=0.5)
+    scheduler     = torch.optim.lr_scheduler.StepLR( optimizer, step_size=250, gamma=0.5)
     
     batch_size           = 256
     average_nbr_corrects = 0; N = 100; alpha = 2./(N+1); 
@@ -475,14 +475,14 @@ if inputDatabase != "" and inputTable != "" :
 if verboseFlag :
     print( trainDataFrame.describe() )
 
-trainDataFrame = limitDataUsingLimitsFromFilename( trainDataFrame, limitsFileName )
+#trainDataFrame = limitDataUsingLimitsFromFilename( trainDataFrame, limitsFileName )
 trainDataFrame = trainDataFrame.select_dtypes(include=['number'])
-trainDataFrame = limitDataUsingProcentiles       ( trainDataFrame )
+#trainDataFrame = limitDataUsingProcentiles       ( trainDataFrame )
 
 if verboseFlag :
     print( trainDataFrame.describe() )
 
-trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
+#trainDataFrame = preProcessData( trainDataFrame, TARGET_COLUMN, seed )
 trainedModelPacket, ( Y_predict, Y_test ) = trainNeuralNetworkModel   ( trainDataFrame, TARGET_COLUMN, featureNames, seed )
 postProcessData( trainedModelPacket, trainDataFrame, TARGET_COLUMN, featureNames )
 
