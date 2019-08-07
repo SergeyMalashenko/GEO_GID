@@ -388,8 +388,10 @@ limitsName   = limitsDict[city]
 
 inputDataFrame = None
 inputDataFrame = loadDataFrame()(databaseName, limitsName, input_tableName,start_date,end_date )
-
-
+d = {'count_ads': len(inputDataFrame.index)}
+with open('{1}/{0}/metadata.json'.format(str(city), str(output_Folder)),
+          "w", encoding="utf-8") as write_file:
+    json.dump(d, write_file, ensure_ascii=False)
 cityDistrictDiagram(inputDataFrame,city,output_Folder)
 numberOfRoomsDiagram(inputDataFrame,city,output_Folder)
 buildingTypeDiagram(inputDataFrame,city,output_Folder)
