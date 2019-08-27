@@ -453,7 +453,7 @@ if end_date == '':
 else:
     end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
 if start_date == '':
-    start_date = end_date - datetime.timedelta(days=60)
+    start_date = end_date - datetime.timedelta(days=365)
 else:
     start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
 
