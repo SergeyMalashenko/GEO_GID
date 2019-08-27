@@ -92,7 +92,6 @@ def cityDistrictDiagram(inputDataFrame,city,output_Folder):
             plt.title('Территориальная структура рынка готового жилья {}'.format(str(Moscow_AO)), fontweight='bold', fontsize = 20)
 
             plt.tick_params(axis='both', which='major', labelsize=16)
-            plt.legend(labels=None)
             plt.tight_layout()
             plt.savefig('{2}/{0}/Территориальная структура рынка готового жилья {1}.png'.format(str(city),str(Moscow_AO),str(output_Folder)))
     else:
