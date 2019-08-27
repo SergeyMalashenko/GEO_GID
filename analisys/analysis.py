@@ -92,6 +92,7 @@ def cityDistrictDiagram(inputDataFrame,city,output_Folder):
             plt.title('Территориальная структура рынка готового жилья {}'.format(str(Moscow_AO)), fontweight='bold', fontsize = 20)
 
             plt.tick_params(axis='both', which='major', labelsize=16)
+            plt.legend(labels=None)
             plt.tight_layout()
             plt.savefig('{2}/{0}/Территориальная структура рынка готового жилья {1}.png'.format(str(city),str(Moscow_AO),str(output_Folder)))
     else:
@@ -106,7 +107,6 @@ def cityDistrictDiagram(inputDataFrame,city,output_Folder):
         df.plot.pie(y='Территориальная структура рынка готового жилья', autopct='%1.1f%%')
         plt.ylabel('', fontweight='bold')
         plt.title('Территориальная структура рынка готового жилья', fontweight='bold', fontsize = 20)
-        plt.legend(label=None)
         plt.tick_params(axis='both', which='major', labelsize=16)
         plt.tight_layout()
         if city == '':
@@ -145,7 +145,10 @@ def buildingTypeDiagram(inputDataFrame,city,output_Folder):
     df = df.apply(lambda x: 100 * x / float(x.sum()))
 
     fig, ax = plt.subplots()
-    plt.tick_params(axis='both', which='major', labelsize=12)
+    plt.tick_params(axis='both', which='major', labelsize=13)
+
+    bars = ax.bar(x=df.index, height=df['Структура рынка по типам готового жилья'],
+                  color=color, align='center')
     i = 0
     for tick in ax.get_xaxis().get_major_ticks():
         if (i % 2) == 0:
@@ -154,8 +157,6 @@ def buildingTypeDiagram(inputDataFrame,city,output_Folder):
             tick.set_pad(4.)
         tick.label1 = tick._get_text1()
         i += 1
-    bars = ax.bar(x=df.index, height=df['Структура рынка по типам готового жилья'],
-                  color=color, align='center')
     for p in ax.patches:
         ax.annotate("{:.2f}%".format(p.get_height()), (p.get_x() + p.get_width() / 2., p.get_height()),
                     ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=12,
@@ -219,6 +220,8 @@ def buildingTypeAndMeanPrice(inputDataFrame,city,output_Folder):
         json.dump(inputDataFrame['pricePerSquare'].to_json(force_ascii=False,double_precision=0), write_file, ensure_ascii=False)
 
     fig, ax = plt.subplots()
+
+    bars = ax.bar(x=inputDataFrame.index, height=inputDataFrame['pricePerSquare'],color=color)
     plt.tick_params(axis='both', which='major', labelsize=12)
     i = 0
     for tick in ax.get_xaxis().get_major_ticks():
@@ -227,8 +230,8 @@ def buildingTypeAndMeanPrice(inputDataFrame,city,output_Folder):
         else:
             tick.set_pad(4.)
         tick.label1 = tick._get_text1()
-        i+=1
-    bars = ax.bar(x=inputDataFrame.index, height=inputDataFrame['pricePerSquare'],color=color)
+        print(i)
+        i += 1
     for p in ax.patches:
         ax.annotate(int(np.round(p.get_height(), decimals=0)), (p.get_x() + p.get_width() / 2., p.get_height()),
                     ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=16, textcoords='offset points')
@@ -252,37 +255,41 @@ def cityDistrictAndMeanPrice(inputDataFrame,city,output_Folder):
         for Moscow_AO in Districts_Moscow.keys():
             Districts_AO = Districts_Moscow[Moscow_AO]
             Moscow_AODataFrame = inputDataFrame.loc[Districts_AO]
-        fig, ax = plt.subplots()
-        plt.tick_params(axis='both', which='major', labelsize=15)
-        i = 0
-        for tick in ax.get_xaxis().get_major_ticks():
-            if (i % 2) == 0:
-                tick.set_pad(26.)
-            else:
-                tick.set_pad(4.)
-            tick.label1 = tick._get_text1()
-            i += 1
-        bars = ax.bar(x=Moscow_AODataFrame.index, height=Moscow_AODataFrame['pricePerSquare'],color=color)
-        for p in ax.patches:
-            ax.annotate(int(np.round(p.get_height(), decimals=0)), (p.get_x() + p.get_width() / 2., p.get_height()),
-                        ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=16, textcoords='offset points')
-        plt.ylabel('руб./кв.м.',fontweight='bold', fontsize = 16)
-        inputDataFrame = inputDataFrame.sort_values(by='pricePerSquare',ascending=False)
-        print(inputDataFrame['pricePerSquare'])
-        with open('{1}/{0}/Cредняя цена предложения по административным районам {2}.json'.format(str(city),str(output_Folder),str(Moscow_AO)), "w", encoding="utf-8") as write_file:
-            json.dump(inputDataFrame['pricePerSquare'].to_json(force_ascii=False,double_precision=0), write_file, ensure_ascii=False)
-        plt.title('Cредняя цена предложения по административным районам {}'.format(str(Moscow_AO)), fontweight='bold', fontsize=20)
-        i = 0
-        for tick in ax.get_xaxis().get_major_ticks():
-            if (i % 2) == 0:
-                tick.set_pad(26.)
-            else:
-                tick.set_pad(4.)
-            tick.label1 = tick._get_text1()
-            i += 1
-        plt.tight_layout()
-        plt.savefig(
-            '{1}/{0}/Cредняя цена предложения по административным районам {2}.png'.format(str(city), str(output_Folder),str(Moscow_AO)))
+            Moscow_AODataFrame = Moscow_AODataFrame.dropna(subset=['pricePerSquare'])
+            fig, ax = plt.subplots()
+            plt.tick_params(axis='both', which='major', labelsize=12)
+
+            bars = ax.bar(x=Moscow_AODataFrame.index, height=Moscow_AODataFrame['pricePerSquare'],color=color)
+            i = 0
+            for tick in ax.get_xaxis().get_major_ticks():
+                if (i % 2) == 0:
+                    tick.set_pad(26.)
+                else:
+                    tick.set_pad(4.)
+                tick.label1 = tick._get_text1()
+                i += 1
+            print(Moscow_AODataFrame['pricePerSquare'])
+            for p in ax.patches:
+
+                ax.annotate(int(np.round(p.get_height(), decimals=0)), (p.get_x() + p.get_width() / 2., p.get_height()),
+                            ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=16, textcoords='offset points')
+            plt.ylabel('руб./кв.м.',fontweight='bold', fontsize = 16)
+            inputDataFrame = inputDataFrame.sort_values(by='pricePerSquare',ascending=False)
+            print(inputDataFrame['pricePerSquare'])
+            with open('{1}/{0}/Cредняя цена предложения по административным районам {2}.json'.format(str(city),str(output_Folder),str(Moscow_AO)), "w", encoding="utf-8") as write_file:
+                json.dump(inputDataFrame['pricePerSquare'].to_json(force_ascii=False,double_precision=0), write_file, ensure_ascii=False)
+            plt.title('Cредняя цена предложения по административным районам {}'.format(str(Moscow_AO)), fontweight='bold', fontsize=20)
+            i = 0
+            for tick in ax.get_xaxis().get_major_ticks():
+                if (i % 2) == 0:
+                    tick.set_pad(26.)
+                else:
+                    tick.set_pad(4.)
+                tick.label1 = tick._get_text1()
+                i += 1
+            plt.tight_layout()
+            plt.savefig(
+                '{1}/{0}/Cредняя цена предложения по административным районам {2}.png'.format(str(city), str(output_Folder),str(Moscow_AO)))
     else:
         fig, ax = plt.subplots()
         plt.tick_params(axis='both', which='major', labelsize=15)
@@ -427,7 +434,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--start_date"  , type=str, default='')
 parser.add_argument("--end_date", type=str, default='')
-parser.add_argument("--city", type=str, default='Kazan')
+parser.add_argument("--city", type=str, default='Moscow')
 
 args = parser.parse_args()
 # Create .env file path.
@@ -446,7 +453,7 @@ if end_date == '':
 else:
     end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
 if start_date == '':
-    start_date = end_date - datetime.timedelta(days=365)
+    start_date = end_date - datetime.timedelta(days=60)
 else:
     start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
 
