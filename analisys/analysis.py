@@ -140,27 +140,27 @@ def buildingTypeDiagram(inputDataFrame,city,output_Folder):
     print(inputDataFrame[['building_type', 'count_of_building_type']])
     if 'Другое' in inputDataFrame['building_type'].values:
         inputDataFrame = inputDataFrame.loc[inputDataFrame['building_type'].values!='Другое']
+    for i in range(0,len(inputDataFrame.index)):
+        inputDataFrame['building_type'].iloc[i] = inputDataFrame['building_type'].iloc[i].replace(" ", "\n")
     df = pd.DataFrame({'Структура рынка по типам готового жилья': inputDataFrame['count_of_building_type'].values}, index=inputDataFrame['building_type'])
     df = df[df.index != '']
     df = df.apply(lambda x: 100 * x / float(x.sum()))
 
     fig, ax = plt.subplots()
-    plt.tick_params(axis='both', which='major', labelsize=13)
+    plt.tick_params(axis='both', which='major', labelsize=14)
 
     bars = ax.bar(x=df.index, height=df['Структура рынка по типам готового жилья'],
                   color=color, align='center')
-    i = 0
-    for tick in ax.get_xaxis().get_major_ticks():
-        if (i % 2) == 0:
-            tick.set_pad(26.)
-        else:
-            tick.set_pad(4.)
-        tick.label1 = tick._get_text1()
-        i += 1
+
     for p in ax.patches:
         ax.annotate("{:.2f}%".format(p.get_height()), (p.get_x() + p.get_width() / 2., p.get_height()),
                     ha='center', va='center', xytext=(0, 10), fontweight='bold', fontsize=12,
                     textcoords='offset points')
+    for i in range(0,len(inputDataFrame.index)):
+        inputDataFrame['building_type'].iloc[i] = inputDataFrame['building_type'].iloc[i].replace("\n", " ")
+    df = pd.DataFrame({'Структура рынка по типам готового жилья': inputDataFrame['count_of_building_type'].values}, index=inputDataFrame['building_type'])
+    df = df[df.index != '']
+    df = df.apply(lambda x: 100 * x / float(x.sum()))
     df = df.sort_values(by='Структура рынка по типам готового жилья', ascending=False)
     with open('{1}/{0}/Структура рынка по типам готового жилья.json'.format(str(city), str(output_Folder)), "w",
               encoding="utf-8") as write_file:
@@ -216,13 +216,14 @@ def buildingTypeAndMeanPrice(inputDataFrame,city,output_Folder):
     print(inputDataFrame['pricePerSquare'])
     inputDataFrame = inputDataFrame[inputDataFrame.index != '']
     inputDataFrame = inputDataFrame[inputDataFrame.index !='Другое']
+
     with open('{1}/{0}/Cредняя цена предложения по типам готового жилья.json'.format(str(city),str(output_Folder)), "w", encoding="utf-8") as write_file:
         json.dump(inputDataFrame['pricePerSquare'].to_json(force_ascii=False,double_precision=0), write_file, ensure_ascii=False)
 
     fig, ax = plt.subplots()
 
     bars = ax.bar(x=inputDataFrame.index, height=inputDataFrame['pricePerSquare'],color=color)
-    plt.tick_params(axis='both', which='major', labelsize=12)
+    plt.tick_params(axis='both', which='major', labelsize=13)
     i = 0
     for tick in ax.get_xaxis().get_major_ticks():
         if (i % 2) == 0:
@@ -471,10 +472,10 @@ d = {'count_ads': len(inputDataFrame.index)}
 with open('{1}/{0}/metadata.json'.format(str(city), str(output_Folder)),
           "w", encoding="utf-8") as write_file:
     json.dump(d, write_file, ensure_ascii=False)
-cityDistrictDiagram(inputDataFrame,city,output_Folder)
-numberOfRoomsDiagram(inputDataFrame,city,output_Folder)
+#cityDistrictDiagram(inputDataFrame,city,output_Folder)
+#numberOfRoomsDiagram(inputDataFrame,city,output_Folder)
 buildingTypeDiagram(inputDataFrame,city,output_Folder)
 buildingTypeAndMeanPrice(inputDataFrame,city,output_Folder)
-cityDistrictAndMeanPrice(inputDataFrame,city,output_Folder)
-dynamicsOfMeanPrice(inputDataFrame,city,output_Folder)
-buildingTypeAndMeanPriceCityDistricts(inputDataFrame,city,output_Folder)
+#cityDistrictAndMeanPrice(inputDataFrame,city,output_Folder)
+#dynamicsOfMeanPrice(inputDataFrame,city,output_Folder)
+#buildingTypeAndMeanPriceCityDistricts(inputDataFrame,city,output_Folder)
