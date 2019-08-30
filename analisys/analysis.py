@@ -472,10 +472,10 @@ d = {'count_ads': len(inputDataFrame.index)}
 with open('{1}/{0}/metadata.json'.format(str(city), str(output_Folder)),
           "w", encoding="utf-8") as write_file:
     json.dump(d, write_file, ensure_ascii=False)
-#cityDistrictDiagram(inputDataFrame,city,output_Folder)
-#numberOfRoomsDiagram(inputDataFrame,city,output_Folder)
+cityDistrictDiagram(inputDataFrame,city,output_Folder)
+numberOfRoomsDiagram(inputDataFrame,city,output_Folder)
 buildingTypeDiagram(inputDataFrame,city,output_Folder)
 buildingTypeAndMeanPrice(inputDataFrame,city,output_Folder)
-#cityDistrictAndMeanPrice(inputDataFrame,city,output_Folder)
-#dynamicsOfMeanPrice(inputDataFrame,city,output_Folder)
-#buildingTypeAndMeanPriceCityDistricts(inputDataFrame,city,output_Folder)
+cityDistrictAndMeanPrice(inputDataFrame,city,output_Folder)
+dynamicsOfMeanPrice(inputDataFrame,city,output_Folder)
+buildingTypeAndMeanPriceCityDistricts(inputDataFrame,city,output_Folder)
