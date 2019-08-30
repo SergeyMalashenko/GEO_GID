@@ -164,9 +164,13 @@ def smoothDataFrame( inputDataFrame, distance_limit = 0.005 ):
 parser = argparse.ArgumentParser()
 parser.add_argument("--database"    , type=str, default="mysql://root:UWmnjxPdN5ywjEcN@188.120.245.195:3306/domprice_dev1_v2" )
 
-parser.add_argument("--input_table" , type=str, default="src_ads_raw_52" )
-parser.add_argument("--output_table", type=str, default="src_ads_raw_52_processed" )
-parser.add_argument("--limits"      , type=str, default="input/NizhnyNovgorodLimits.json" )
+parser.add_argument("--input_table" , type=str, default="src_ads_raw_02" )
+parser.add_argument("--output_table", type=str, default="src_ads_raw_02_processed" )
+parser.add_argument("--limits"      , type=str, default="input/UfaLimits.json" )
+
+#parser.add_argument("--input_table" , type=str, default="src_ads_raw_52" )
+#parser.add_argument("--output_table", type=str, default="src_ads_raw_52_processed" )
+#parser.add_argument("--limits"      , type=str, default="input/NizhnyNovgorodLimits.json" )
 
 #parser.add_argument("--input_table" , type=str, default="src_ads_raw_16" )
 #parser.add_argument("--output_table", type=str, default="src_ads_raw_16_processed" )
