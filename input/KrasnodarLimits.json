@@ -1,0 +1,21 @@
+{
+	"total_square"    : 
+		{ "min" : 12    , "max" : 500  },
+	"kitchen_square"  : 
+		{ "min" : 4     , "max" : 100  },
+	"living_square"   :
+		{ "min" : 12     ,"max" : 500  },
+	"number_of_rooms" : 
+		{ "min" : 1     , "max" : 10   },
+	"number_of_floors":
+		{ "min" : 2     , "max" : 50   },
+	"floor_number":
+		{ "min" : 1     , "max" : 50   },
+	"latitude"        : 
+		{ "min" : 44.96 , "max" : 45.15},
+	"longitude"       : 
+		{ "min" : 38.86 , "max" : 39.15},
+	"exploitation_start_year" :
+		{ "min" : 1855  , "max" : 2019 }
+}
+

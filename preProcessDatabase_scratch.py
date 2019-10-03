@@ -100,7 +100,7 @@ def clearDataFromAnomalies(inputDataFrame):
     
     return inliersDataFrame, outliersDataFrame
 
-def smoothDataFrame( inputDataFrame, distance_limit = 0.005 ):
+def smoothDataFrame( inputDataFrame, distance_limit = 0.0075 ):
     outputDataFrame = inputDataFrame.copy()
     
     features = ['longitude','latitude','number_of_floors','number_of_rooms','exploitation_start_year']
@@ -164,9 +164,13 @@ def smoothDataFrame( inputDataFrame, distance_limit = 0.005 ):
 parser = argparse.ArgumentParser()
 parser.add_argument("--database"    , type=str, default="mysql://root:UWmnjxPdN5ywjEcN@188.120.245.195:3306/domprice_dev1_v2" )
 
-parser.add_argument("--input_table" , type=str, default="src_ads_raw_02" )
-parser.add_argument("--output_table", type=str, default="src_ads_raw_02_processed" )
-parser.add_argument("--limits"      , type=str, default="input/UfaLimits.json" )
+#parser.add_argument("--input_table" , type=str, default="src_ads_raw_54" )
+#parser.add_argument("--output_table", type=str, default="src_ads_raw_54_processed" )
+#parser.add_argument("--limits"      , type=str, default="input/NovosibirskLimits.json" )
+
+#parser.add_argument("--input_table" , type=str, default="src_ads_raw_02" )
+#parser.add_argument("--output_table", type=str, default="src_ads_raw_02_processed" )
+#parser.add_argument("--limits"      , type=str, default="input/UfaLimits.json" )
 
 #parser.add_argument("--input_table" , type=str, default="src_ads_raw_52" )
 #parser.add_argument("--output_table", type=str, default="src_ads_raw_52_processed" )
@@ -183,6 +187,10 @@ parser.add_argument("--limits"      , type=str, default="input/UfaLimits.json" )
 #parser.add_argument("--input_table" , type=str, default="src_ads_raw_77" )
 #parser.add_argument("--output_table", type=str, default="src_ads_raw_77_processed" )
 #parser.add_argument("--limits"      , type=str, default="input/MoscowLimits.json" )
+
+parser.add_argument("--input_table" , type=str, default="src_ads_raw_23" )
+parser.add_argument("--output_table", type=str, default="src_ads_raw_23_processed" )
+parser.add_argument("--limits"      , type=str, default="input/KrasnodarLimits.json" )
 
 args = parser.parse_args()
 
